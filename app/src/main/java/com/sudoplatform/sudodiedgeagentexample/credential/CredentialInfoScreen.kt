@@ -1,0 +1,119 @@
+/*
+ * Copyright © 2023 Anonyome Labs, Inc. All rights reserved.
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+package com.sudoplatform.sudodiedgeagentexample.credential
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
+import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialAttribute
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialMetadata
+import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
+import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
+import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
+import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
+import com.sudoplatform.sudologging.Logger
+
+@Composable
+fun CredentialInfoScreen(
+    credentialId: String,
+    agent: SudoDIEdgeAgent,
+    logger: Logger,
+) {
+    val context = LocalContext.current
+
+    var credential: Credential? by remember { mutableStateOf(null) }
+
+    /**
+     * When this composable initializes, load the [Credential] from the ID that was
+     * passed in. Displaying an error toast if the [Credential] cannot be found in the
+     * agent (should be logically impossible/unlikely).
+     */
+    LaunchedEffect(key1 = Unit) {
+        runCatching {
+            val loadedCredEx = agent.credentials.getById(credentialId)
+                ?: throw Exception("Could not find credential")
+            credential = loadedCredEx
+        }.showToastOnFailure(context, logger, "Failed to load credential")
+    }
+
+    CredentialInfoScreenView(
+        credential,
+    )
+}
+
+/**
+ * UI for the "Credential Info Screen". Shows the details of a given [Credential].
+ *
+ * UI will display a loading spinner until [credential] becomes non-null.
+ */
+@Composable
+fun CredentialInfoScreenView(credential: Credential?) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(SCREEN_PADDING),
+    ) {
+        if (credential == null) {
+            Column(
+                Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                CircularProgressIndicator(Modifier.padding(vertical = 8.dp))
+            }
+        } else {
+            CredentialInfoColumn(
+                Modifier.weight(1.0f),
+                id = credential.credentialId,
+                fromConnection = credential.connectionId,
+                metadata = credential.credentialMetadata,
+                attributes = credential.credentialAttributes,
+            )
+        }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun DefaultPreview() {
+    SudoDIEdgeAgentExampleTheme {
+        CredentialInfoScreenView(
+            credential = Credential(
+                "cred1",
+                "credEx1",
+                "conn1",
+                CredentialMetadata(
+                    "credDef1",
+                    CredentialDefinitionInfo("My Cred Def 1"),
+                    "schema1",
+                    SchemaInfo("My Schema 1", "1.0"),
+                ),
+                listOf(
+                    CredentialAttribute("Attribute 1", "Value 1", null),
+                    CredentialAttribute("Attribute 2", "Value 2", null),
+                ),
+                listOf(),
+            ),
+        )
+    }
+}
