@@ -46,12 +46,14 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchange
+import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeRole
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeState
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
 import com.sudoplatform.sudodiedgeagent.types.Routing
 import com.sudoplatform.sudodiedgeagentexample.SingleSudoManager
 import com.sudoplatform.sudodiedgeagentexample.relay.SudoDIRelayMessageSource
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
+import com.sudoplatform.sudodiedgeagentexample.utils.makeReceivedMessageMetadata
 import com.sudoplatform.sudodiedgeagentexample.utils.showToast
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudodirelay.SudoDIRelayClient
@@ -96,6 +98,7 @@ fun ConnectionInvitationScannerScreen(
         val subscriptionId = agent.subscribeToAgentEvents(object : AgentEventSubscriber {
             override fun connectionExchangeStateChanged(connectionExchange: ConnectionExchange) {
                 if (connectionExchange.state != ConnectionExchangeState.INVITATION) return
+                if (connectionExchange.role != ConnectionExchangeRole.INVITEE) return
                 incomingInvite = connectionExchange
             }
         })
@@ -127,7 +130,7 @@ fun ConnectionInvitationScannerScreen(
 
                 val invitation = Base64.decode(base64Invitation, Base64.URL_SAFE)
 
-                agent.receiveMessage(invitation)
+                agent.receiveMessage(invitation, makeReceivedMessageMetadata())
             }.showToastOnFailure(
                 context,
                 logger,

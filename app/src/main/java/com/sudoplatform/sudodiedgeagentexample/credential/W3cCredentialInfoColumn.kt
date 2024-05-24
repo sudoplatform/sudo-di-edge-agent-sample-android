@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
@@ -19,22 +19,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialAttribute
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialMetadata
+import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 
 /**
- * Helper UI element for displaying the details of a credential or credential exchange.
+ * Helper UI element for displaying the details of a w3c credential or credential exchange.
  */
 @Composable
-fun CredentialInfoColumn(
+fun W3cCredentialInfoColumn(
     modifier: Modifier = Modifier,
     id: String,
     fromConnection: String,
-    metadata: CredentialMetadata,
-    attributes: List<CredentialAttribute>,
+    w3cCredential: W3cCredential,
+    proofType: JsonLdProofType? = null,
 ) {
+    val credSubjectId = w3cCredential.credentialSubject.firstOrNull()?.id ?: "None"
+    val credSubjectAttributes =
+        w3cCredential.credentialSubject.firstOrNull()?.properties?.entries?.sortedBy { it.key }?.toList()
+            ?: emptyList()
+
     LazyColumn(modifier) {
         item {
             Text(
@@ -51,32 +56,34 @@ fun CredentialInfoColumn(
             ) {
                 NameValueTextColumn("ID", id)
                 NameValueTextColumn("From Connection", fromConnection)
-                NameValueTextColumn("Cred Def ID", metadata.credentialDefinitionId)
-                NameValueTextColumn(
-                    "Cred Def Name",
-                    metadata.credentialDefinitionInfo?.name ?: "Unknown",
-                )
-                NameValueTextColumn("Schema ID", metadata.schemaId)
+                NameValueTextColumn("Format", "W3C")
+                NameValueTextColumn("Issuer", w3cCredential.issuer.id)
+                NameValueTextColumn("Issuance Date", w3cCredential.issuanceDate)
+                NameValueTextColumn("Type", w3cCredential.types.find { it != "VerifiableCredential" } ?: "")
+                proofType?.let {
+                    NameValueTextColumn("Issuer Proof Type", it.toString())
+                }
             }
-            Divider()
+            HorizontalDivider()
 
             Text(
-                text = "Attributes",
+                text = "Credential Subject",
                 Modifier
                     .fillMaxWidth()
                     .padding(vertical = 16.dp),
                 textAlign = TextAlign.Center,
                 fontWeight = FontWeight.Bold,
             )
+            NameValueTextRow("Subject Id", credSubjectId)
         }
         items(
-            items = attributes.sortAlphabetically(),
-            key = { it.name },
+            items = credSubjectAttributes,
+            key = { it.key },
             itemContent = { item ->
                 val currentItem = rememberUpdatedState(item)
                 NameValueTextRow(
-                    name = currentItem.value.name,
-                    value = currentItem.value.value,
+                    name = currentItem.value.key,
+                    value = currentItem.value.value.toString(),
                 )
             },
         )

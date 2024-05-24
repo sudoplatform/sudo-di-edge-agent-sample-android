@@ -6,16 +6,16 @@
 
 package com.sudoplatform.sudodiedgeagentexample.credential
 
+import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
 import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialAttribute
 
 /**
- * Sort a list of [CredentialAttribute]s alphabetically using their [CredentialAttribute.name]
- * property.
+ * Sort a list of [AnoncredV1CredentialAttribute]s alphabetically using
+ * their [AnoncredV1CredentialAttribute.name] property.
  *
  * @return the sorted list
  */
-fun List<CredentialAttribute>.sortAlphabetically(): List<CredentialAttribute> {
+fun List<AnoncredV1CredentialAttribute>.sortAlphabetically(): List<AnoncredV1CredentialAttribute> {
     return sortedBy { it.name }
 }
 

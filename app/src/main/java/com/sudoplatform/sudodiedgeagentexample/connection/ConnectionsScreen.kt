@@ -15,8 +15,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,8 +39,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.connections.types.Connection
+import com.sudoplatform.sudodiedgeagentexample.Routes
+import com.sudoplatform.sudodiedgeagentexample.connection.chat.ConnectionChatScreen
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.SwipeToDeleteCard
@@ -47,6 +54,7 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun ConnectionsScreen(
+    navController: NavController,
     agent: SudoDIEdgeAgent,
     logger: Logger,
 ) {
@@ -84,6 +92,13 @@ fun ConnectionsScreen(
     }
 
     /**
+     * Navigate to the [ConnectionChatScreen] for the selected connection [id]
+     */
+    fun navigateToChatView(id: String) {
+        navController.navigate("${Routes.CHAT}/$id")
+    }
+
+    /**
      * When this composable initializes, load the connection list
      */
     LaunchedEffect(key1 = Unit) {
@@ -95,6 +110,7 @@ fun ConnectionsScreen(
         connectionList,
         refreshConnectionList = { refreshConnectionList() },
         deleteConnection = { deleteConnection(it) },
+        onOpenChat = { navigateToChatView(it) },
     )
 }
 
@@ -107,6 +123,7 @@ fun ConnectionsScreenView(
     connectionList: List<Connection>,
     refreshConnectionList: () -> Unit,
     deleteConnection: (id: String) -> Unit,
+    onOpenChat: (id: String) -> Unit,
 ) {
     Column(
         Modifier
@@ -147,7 +164,10 @@ fun ConnectionsScreenView(
                             SwipeToDeleteCard(onDelete = {
                                 deleteConnection(currentItem.value.connectionId)
                             }) {
-                                ConnectionItemCardContent(currentItem.value)
+                                ConnectionItemCardContent(
+                                    currentItem.value,
+                                    onOpenChat = { onOpenChat(currentItem.value.connectionId) },
+                                )
                             }
                         }
                     },
@@ -166,6 +186,7 @@ fun ConnectionsScreenView(
 @Composable
 private fun ConnectionItemCardContent(
     item: Connection,
+    onOpenChat: () -> Unit,
 ) {
     Row(
         Modifier.padding(8.dp),
@@ -184,6 +205,12 @@ private fun ConnectionItemCardContent(
                 overflow = TextOverflow.Ellipsis,
             )
         }
+        IconButton(onOpenChat) {
+            Icon(
+                Icons.Outlined.MailOutline,
+                contentDescription = "Start chatting",
+            )
+        }
     }
 }
 
@@ -198,17 +225,16 @@ private fun DefaultPreview() {
                     "1",
                     "conn1",
                     "John",
-                    null,
                     listOf(),
                 ),
                 Connection(
                     "2",
                     "conn2",
                     "Doe",
-                    null,
                     listOf(),
                 ),
             ),
+            {},
             {},
             {},
         )

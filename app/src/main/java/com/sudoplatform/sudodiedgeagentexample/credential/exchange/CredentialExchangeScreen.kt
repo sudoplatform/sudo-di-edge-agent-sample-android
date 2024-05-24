@@ -39,11 +39,15 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchange
+import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeInitiator
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeState
+import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialMetadata
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
+import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
 import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
 import com.sudoplatform.sudodiedgeagentexample.Routes
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
@@ -54,6 +58,7 @@ import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudodiedgeagentexample.utils.swapList
 import com.sudoplatform.sudologging.Logger
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 
 @Composable
 fun CredentialExchangeScreen(
@@ -243,13 +248,25 @@ private fun CredentialExchangeItemCardContent(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            item.credentialMetadata.credentialDefinitionInfo?.name?.let { credDefName ->
-                Text(
-                    text = credDefName,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+            val (credName, credFormatName) = when (val data = item.formatData) {
+                is CredentialExchangeFormatData.Indy -> Pair(
+                    data.credentialMetadata.credentialDefinitionInfo?.name
+                        ?: data.credentialMetadata.credentialDefinitionId,
+                    "Anoncred",
+                )
+
+                is CredentialExchangeFormatData.AriesLdProof -> Pair(
+                    data.currentProposedCredential.types.find { it != "VerifiableCredential" }
+                        ?: "VerifiableCredential",
+                    "W3C",
                 )
             }
+            Text(
+                text = credName,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(text = credFormatName)
             Text(
                 text = item.state.toString().lowercase()
                     .replaceFirstChar { it.uppercase() },
@@ -274,13 +291,39 @@ private fun DefaultPreview() {
                     "",
                     CredentialExchangeInitiator.EXTERNAL,
                     CredentialExchangeState.ACKED,
-                    CredentialMetadata(
-                        "",
-                        CredentialDefinitionInfo("Driver's License"),
-                        "",
-                        SchemaInfo("", ""),
+                    CredentialExchangeFormatData.Indy(
+                        AnoncredV1CredentialMetadata(
+                            "",
+                            CredentialDefinitionInfo("Driver's License"),
+                            "",
+                            SchemaInfo("", ""),
+                        ),
+                        listOf(),
                     ),
+                    null,
                     listOf(),
+                ),
+                CredentialExchange(
+                    "credEx2",
+                    "",
+                    "",
+                    CredentialExchangeInitiator.EXTERNAL,
+                    CredentialExchangeState.OFFER,
+                    formatData = CredentialExchangeFormatData.AriesLdProof(
+                        currentProposedCredential =
+                        W3cCredential(
+                            contexts = emptyList(),
+                            id = null,
+                            types = listOf("Foobar"),
+                            credentialSubject = emptyList(),
+                            issuer = CredentialIssuer("", JsonObject(emptyMap())),
+                            issuanceDate = "",
+                            expirationDate = null,
+                            proof = null,
+                            properties = JsonObject(emptyMap()),
+                        ),
+                        currentProposedProofType = JsonLdProofType.ED25519_SIGNATURE2018,
+                    ),
                     null,
                     listOf(),
                 ),

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeState
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
 import com.sudoplatform.sudodiedgeagentexample.Routes
@@ -90,7 +91,11 @@ fun ProofExchangeScreen(
     }
 
     fun navigateToProofExchangePresentation(item: ProofExchange) {
-        navController.navigate("${Routes.PROOF_EXCHANGE_PRESENTATION}/${item.proofExchangeId}")
+        val proofType = when (item.formatData) {
+            is ProofExchangeFormatData.Dif -> Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE
+            is ProofExchangeFormatData.Indy -> Routes.PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE
+        }
+        navController.navigate("${Routes.PROOF_EXCHANGE_PRESENTATION}/$proofType/${item.proofExchangeId}")
     }
 
     /**
@@ -136,7 +141,7 @@ fun ProofExchangeScreen(
  * the [ProofExchange]s held by the agent.
  *
  * For [ProofExchange]s in the [ProofExchangeState.REQUEST] state, a "Present" button
- * will be shown, which when clicked will navigate to the [ProofExchangePresentationScreen]
+ * will be shown, which when clicked will navigate to the [ProofExchangeAnoncredPresentationScreen]
  * where the presentation of that specific [ProofExchange] will be displayed.
  */
 @Composable

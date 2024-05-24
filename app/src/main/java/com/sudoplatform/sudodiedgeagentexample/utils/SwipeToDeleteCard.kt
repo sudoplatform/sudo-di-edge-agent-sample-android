@@ -17,12 +17,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DismissDirection
-import androidx.compose.material3.DismissValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.SwipeToDismiss
-import androidx.compose.material3.rememberDismissState
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -37,32 +36,32 @@ import androidx.compose.ui.unit.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeToDeleteCard(onDelete: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
-    val dismissState = rememberDismissState(
+    val dismissState = rememberSwipeToDismissBoxState(
         positionalThreshold = {
-            150.dp.toPx()
+            150.dp.value
         },
         confirmValueChange = {
-            val wasDismissed = it == DismissValue.DismissedToEnd
+            val wasDismissed = it == SwipeToDismissBoxValue.StartToEnd
             if (wasDismissed) {
                 onDelete()
             }
             wasDismissed
         },
     )
-    SwipeToDismiss(
+    SwipeToDismissBox(
         state = dismissState,
-        directions = setOf(DismissDirection.StartToEnd),
-        background = {
+        enableDismissFromStartToEnd = true,
+        backgroundContent = {
             val bgColor by animateColorAsState(
                 when (dismissState.targetValue) {
-                    DismissValue.DismissedToEnd -> Color.Red
+                    SwipeToDismissBoxValue.StartToEnd -> Color.Red
                     else -> Color.LightGray
                 },
                 label = "Swipe background colour",
             )
             val iconColor by animateColorAsState(
                 when (dismissState.targetValue) {
-                    DismissValue.DismissedToEnd -> Color.White
+                    SwipeToDismissBoxValue.StartToEnd -> Color.White
                     else -> Color.Black
                 },
                 label = "Swipe delete icon colour",
@@ -81,7 +80,7 @@ fun SwipeToDeleteCard(onDelete: () -> Unit, content: @Composable ColumnScope.() 
                 )
             }
         },
-        dismissContent = {
+        content = {
             Card(
                 Modifier
                     .fillMaxWidth(),

@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchange
+import com.sudoplatform.sudodiedgeagent.connections.messaging.types.BasicMessage
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchange
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
@@ -95,6 +96,15 @@ fun HomeScreen(
                 val msg =
                     "Proof exchange updated: ${proofExchange.proofExchangeId}, state: ${proofExchange.state}"
                 scope.launch { showToast(msg, context) }
+            }
+
+            override fun inboundBasicMessage(message: BasicMessage.Inbound) {
+                scope.launch {
+                    val connection = agent.connections.getById(message.connectionId)!!
+                    val contact = connection.theirLabel ?: connection.connectionId
+                    val msg = "New message from $contact"
+                    showToast(msg, context)
+                }
             }
         })
 

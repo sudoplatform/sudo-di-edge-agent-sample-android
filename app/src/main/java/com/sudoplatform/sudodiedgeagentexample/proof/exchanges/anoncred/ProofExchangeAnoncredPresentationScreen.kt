@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.sudoplatform.sudodiedgeagentexample.proof.exchanges
+package com.sudoplatform.sudodiedgeagentexample.proof.exchanges.anoncred
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +17,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,18 +38,22 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
+import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
 import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialAttribute
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PredicateType
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PresentationAttributeGroup
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.AnoncredPresentationAttributeGroup
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.AnoncredPresentationPredicate
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PresentationCredentials
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PresentationPredicate
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeInitiator
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeState
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedAttributeGroupCredentials
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedCredentials
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedPredicateCredentials
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedPresentationCredentials
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredPredicateType
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestAttributeGroupInfo
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestInfo
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestPredicateInfo
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.RetrievedCredentialsForAnoncredItem
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
@@ -60,14 +64,14 @@ import kotlinx.coroutines.launch
 /**
  * Encapsulates all relevant details fetched for the UI of this presentation screen.
  */
-data class PresentationDetails(
+private data class AnoncredPresentationDetails(
     val proofExchange: ProofExchange,
-    val retrievedCredentials: RetrievedCredentials,
-    val credentialIdToAttributes: Map<String, List<CredentialAttribute>>,
+    val retrievedCredentials: RetrievedPresentationCredentials.Indy,
+    val credentialIdToAttributes: Map<String, List<AnoncredV1CredentialAttribute>>,
 )
 
 @Composable
-fun ProofExchangePresentationScreen(
+fun ProofExchangeAnoncredPresentationScreen(
     navController: NavController,
     proofExchangeId: String,
     agent: SudoDIEdgeAgent,
@@ -77,7 +81,7 @@ fun ProofExchangePresentationScreen(
     val scope = rememberCoroutineScope()
 
     /** Full set of details about this presentation, fetched on initialization */
-    var presentationDetails: PresentationDetails? by remember { mutableStateOf(null) }
+    var presentationDetails: AnoncredPresentationDetails? by remember { mutableStateOf(null) }
     var isPresenting by remember { mutableStateOf(false) }
 
     /**
@@ -100,22 +104,24 @@ fun ProofExchangePresentationScreen(
     /**
      * For all the credential IDs that were retrieved as "appropriate" for this
      * presentation, fetch each unique full [Credential] from the [SudoDIEdgeAgent], and
-     * map the credential's ID to the list of [CredentialAttribute] that belong to it.
+     * map the credential's ID to the list of [AnoncredV1CredentialAttribute] that belong to it.
      */
     suspend fun loadAttributesOfAllRetrievedCredentials(
-        retrievedCredentials: RetrievedCredentials,
-    ): Map<String, List<CredentialAttribute>> {
+        retrievedCredentials: RetrievedPresentationCredentials.Indy,
+    ): Map<String, List<AnoncredV1CredentialAttribute>> {
         val allSuitableCredentialIds =
-            retrievedCredentials.requestedAttributes.flatMap { it.credentialIds } +
-                retrievedCredentials.requestedPredicates.flatMap { it.credentialIds }
+            retrievedCredentials.credentialsForRequestedAttributes.flatMap { it.value } +
+                retrievedCredentials.credentialsForRequestedPredicates.flatMap { it.value }
 
         // remove duplicate credentialIds
         val allUniqueCredentialIds = allSuitableCredentialIds.toSet()
 
-        val credentialIdToAttributes = mutableMapOf<String, List<CredentialAttribute>>()
+        val credentialIdToAttributes = mutableMapOf<String, List<AnoncredV1CredentialAttribute>>()
         allUniqueCredentialIds.forEach {
             val credential = agent.credentials.getById(it)
-            val attributes = credential?.credentialAttributes ?: listOf()
+            val attributes =
+                (credential?.formatData as CredentialFormatData.AnoncredV1?)?.credentialAttributes
+                    ?: throw Exception("State error, expected Anoncred, but received something else: $credential")
             credentialIdToAttributes[it] = attributes
         }
 
@@ -123,7 +129,7 @@ fun ProofExchangePresentationScreen(
     }
 
     /**
-     * When the composable initializes, load and set the full [PresentationDetails]
+     * When the composable initializes, load and set the full [AnoncredPresentationDetails]
      * by fetching data from the [SudoDIEdgeAgent]. Relevant data is fetched according
      * to the [proofExchangeId] that is passed to this composable.
      */
@@ -132,13 +138,13 @@ fun ProofExchangePresentationScreen(
             val proofEx = agent.proofs.exchange.getById(proofExchangeId)
                 ?: throw Exception("Could not find proof exchange")
             val retrievedCredentials =
-                agent.proofs.exchange.retrieveCredentialsForProofRequest(proofExchangeId)
+                agent.proofs.exchange.retrieveCredentialsForProofRequest(proofExchangeId) as RetrievedPresentationCredentials.Indy
 
             val credentialIdToAttributes =
                 loadAttributesOfAllRetrievedCredentials(retrievedCredentials)
 
             presentationDetails =
-                PresentationDetails(proofEx, retrievedCredentials, credentialIdToAttributes)
+                AnoncredPresentationDetails(proofEx, retrievedCredentials, credentialIdToAttributes)
         }.showToastOnFailure(context, logger, "Failed to load proof exchange")
     }
 
@@ -151,27 +157,27 @@ fun ProofExchangePresentationScreen(
 
 /**
  * UI for the "Proof Exchange Presentation Screen". Displays base details of the
- * [ProofExchange] that is the subject of this screen, as well as the [RetrievedCredentials]
- * for the [ProofExchange]. [RetrievedCredentials] contains an item for each requested
+ * [ProofExchange] that is the subject of this screen, as well as the [RetrievedPresentationCredentials]
+ * for the [ProofExchange]. [RetrievedPresentationCredentials] contains an item for each requested
  * presentation item (attribute/s or predicate).
  *
- * Each of these [RetrievedCredentials] items are displayed as cards in a list, showing
+ * Each of these [RetrievedPresentationCredentials] items are displayed as cards in a list, showing
  * the details of what is being requested, and a button to "Select". Clicking "Select"
- * will show the [SelectCredentialForItemModal] modal, where the user can see and
+ * will show the [SelectCredentialForAnoncredItemModal] modal, where the user can see and
  * select a credential from the list of appropriate credentials. The selected credential
  * is then used when presenting.
  *
  * The intention of this screen is to provide a UI for constructing a complete
  * [PresentationCredentials] object, containing entries for each requested item in the
- * [RetrievedCredentials] object. After the [PresentationCredentials] is fully constructed,
+ * [RetrievedPresentationCredentials] object. After the [PresentationCredentials] is fully constructed,
  * the "Present" button is enabled and clicking it will send a presentation back to
  * the verifier.
  *
- * UI will display a loading spinner until [PresentationDetails] becomes non-null.
+ * UI will display a loading spinner until [AnoncredPresentationDetails] becomes non-null.
  */
 @Composable
-fun ProofExchangePresentationScreenView(
-    presentationDetails: PresentationDetails?,
+private fun ProofExchangePresentationScreenView(
+    presentationDetails: AnoncredPresentationDetails?,
     present: (PresentationCredentials) -> Unit,
     isPresenting: Boolean,
 ) {
@@ -179,37 +185,37 @@ fun ProofExchangePresentationScreenView(
      * When not null, indicates that the user is in the process of selecting a credential
      * of the item.
      */
-    var selectingCredentialForItem: RetrievedCredentialsForItem? by remember {
+    var selectingCredentialForItem: RetrievedCredentialsForAnoncredItem? by remember {
         mutableStateOf(null)
     }
 
     /**
-     * Construct a map of [PresentationAttributeGroup]s as the user selects credentials for
+     * Construct a map of [AnoncredPresentationAttributeGroup]s as the user selects credentials for
      * each item. This map is used to construct the [PresentationCredentials] when presenting.
      */
     val presentationAttributes = remember {
-        mutableStateMapOf<String, PresentationAttributeGroup>()
+        mutableStateMapOf<String, AnoncredPresentationAttributeGroup>()
     }
 
     /**
-     * Construct a map of [PresentationPredicate]s as the user selects credentials for
+     * Construct a map of [AnoncredPresentationPredicate]s as the user selects credentials for
      * each item. This map is used to construct the [PresentationCredentials] when presenting.
      */
     val presentationPredicates = remember {
-        mutableStateMapOf<String, PresentationPredicate>()
+        mutableStateMapOf<String, AnoncredPresentationPredicate>()
     }
 
     /**
      * The presentation is determined as 'ready to present' once the user has selected
-     * credentials for all requested items within [RetrievedCredentials].
+     * credentials for all requested items within [RetrievedPresentationCredentials].
      */
     val allAttributesSelected =
-        presentationDetails?.retrievedCredentials?.requestedAttributes?.all {
-            presentationAttributes.contains(it.groupIdentifier)
+        presentationDetails?.retrievedCredentials?.credentialsForRequestedAttributes?.all {
+            presentationAttributes.contains(it.key)
         } ?: false
     val allPredicatesSelected =
-        presentationDetails?.retrievedCredentials?.requestedPredicates?.all {
-            presentationPredicates.contains(it.predicateIdentifier)
+        presentationDetails?.retrievedCredentials?.credentialsForRequestedPredicates?.all {
+            presentationPredicates.contains(it.key)
         } ?: false
     val readyToPresent = allAttributesSelected && allPredicatesSelected
 
@@ -218,36 +224,36 @@ fun ProofExchangePresentationScreenView(
      * [PresentationCredentials] from the maps this composable has constructed.
      */
     fun presentSelectedCredentials() {
-        val presentationCredentials = PresentationCredentials(
-            requestedAttributes = presentationAttributes.toMap(),
-            requestedPredicates = presentationPredicates.toMap(),
+        val presentationCredentials = PresentationCredentials.Indy(
+            credentialsForRequestedAttributes = presentationAttributes.toMap(),
+            credentialsForRequestedPredicates = presentationPredicates.toMap(),
         )
         present(presentationCredentials)
     }
 
     /**
-     * For a given [item] from the passed in [RetrievedCredentials], mark the
+     * For a given [item] from the passed in [RetrievedPresentationCredentials], mark the
      * [selectedCredId] as the credential ID selected for the item. This is put into
      * the maps within this composable. These maps are then used to construct a
      * [PresentationCredentials] when presenting.
      */
-    fun selectCredentialForItem(item: RetrievedCredentialsForItem, selectedCredId: String) {
+    fun selectCredentialForItem(item: RetrievedCredentialsForAnoncredItem, selectedCredId: String) {
         when (item) {
-            is RetrievedCredentialsForItem.AttributeGroup -> presentationAttributes[item.item.groupIdentifier] =
-                PresentationAttributeGroup(selectedCredId, revealed = true)
+            is RetrievedCredentialsForAnoncredItem.AttributeGroup -> presentationAttributes[item.itemReferent] =
+                AnoncredPresentationAttributeGroup(selectedCredId, revealed = true)
 
-            is RetrievedCredentialsForItem.Predicate -> presentationPredicates[item.item.predicateIdentifier] =
-                PresentationPredicate(selectedCredId)
+            is RetrievedCredentialsForAnoncredItem.Predicate -> presentationPredicates[item.itemReferent] =
+                AnoncredPresentationPredicate(selectedCredId)
         }
     }
 
     /**
-     * If a [RetrievedCredentialsForItem] item has been selected, then show a
-     * [SelectCredentialForItemModal] modal for this item, where the user can
+     * If a [RetrievedCredentialsForAnoncredItem] item has been selected, then show a
+     * [SelectCredentialForAnoncredItemModal] modal for this item, where the user can
      * see appropriate credentials for the item.
      */
     selectingCredentialForItem?.let { selectingForItem ->
-        SelectCredentialForItemModal(
+        SelectCredentialForAnoncredItemModal(
             onDismissRequest = { selectingCredentialForItem = null },
             item = selectingForItem,
             onSelect = { selectedCredId ->
@@ -281,6 +287,8 @@ fun ProofExchangePresentationScreenView(
         } else {
             val proofEx = presentationDetails.proofExchange
             val retrievedCreds = presentationDetails.retrievedCredentials
+            val anoncredProofRequest =
+                (proofEx.formatData as ProofExchangeFormatData.Indy).proofRequest
 
             LazyColumn(Modifier.weight(1.0f)) {
                 item {
@@ -299,10 +307,10 @@ fun ProofExchangePresentationScreenView(
                         NameValueTextColumn("ID", proofEx.proofExchangeId)
                         NameValueTextColumn("From Connection", proofEx.connectionId)
                     }
-                    Divider()
+                    HorizontalDivider()
                 }
 
-                if (retrievedCreds.requestedAttributes.isNotEmpty()) {
+                if (retrievedCreds.credentialsForRequestedAttributes.isNotEmpty()) {
                     item {
                         Text(
                             text = "Requested Attributes",
@@ -315,14 +323,19 @@ fun ProofExchangePresentationScreenView(
                     }
 
                     items(
-                        items = retrievedCreds.requestedAttributes,
-                        key = { it.groupIdentifier },
-                    ) { item ->
-                        val currentItem = rememberUpdatedState(item)
+                        items = retrievedCreds.credentialsForRequestedAttributes.toList(),
+                        key = { (referent, _) -> referent },
+                    ) { credForReferentEntry ->
+                        val currentItem = rememberUpdatedState(credForReferentEntry)
+                        val requestedGroup =
+                            anoncredProofRequest.requestedAttributes[currentItem.value.first]!!
                         val selectedCredentialId =
-                            presentationAttributes[currentItem.value.groupIdentifier]?.credentialId
-                        val generalItem =
-                            RetrievedCredentialsForItem.AttributeGroup(currentItem.value)
+                            presentationAttributes[currentItem.value.first]?.credentialId
+                        val generalItem = RetrievedCredentialsForAnoncredItem.AttributeGroup(
+                            requestedGroup,
+                            currentItem.value.first,
+                            currentItem.value.second,
+                        )
 
                         RequestedItemCard(
                             item = generalItem,
@@ -334,7 +347,7 @@ fun ProofExchangePresentationScreenView(
                     }
                 }
 
-                if (retrievedCreds.requestedPredicates.isNotEmpty()) {
+                if (retrievedCreds.credentialsForRequestedPredicates.isNotEmpty()) {
                     item {
                         Text(
                             text = "Requested Predicates",
@@ -347,13 +360,19 @@ fun ProofExchangePresentationScreenView(
                     }
 
                     items(
-                        items = retrievedCreds.requestedPredicates,
-                        key = { it.predicateIdentifier },
+                        items = retrievedCreds.credentialsForRequestedPredicates.toList(),
+                        key = { (referent, _) -> referent },
                     ) { item ->
                         val currentItem = rememberUpdatedState(item)
+                        val requestedPred =
+                            anoncredProofRequest.requestedPredicates[currentItem.value.first]!!
                         val selectedCredentialId =
-                            presentationPredicates[currentItem.value.predicateIdentifier]?.credentialId
-                        val generalItem = RetrievedCredentialsForItem.Predicate(currentItem.value)
+                            presentationAttributes[currentItem.value.first]?.credentialId
+                        val generalItem = RetrievedCredentialsForAnoncredItem.Predicate(
+                            requestedPred,
+                            currentItem.value.first,
+                            currentItem.value.second,
+                        )
 
                         RequestedItemCard(
                             item = generalItem,
@@ -391,7 +410,7 @@ fun ProofExchangePresentationScreenView(
  */
 @Composable
 private fun RequestedItemCard(
-    item: RetrievedCredentialsForItem,
+    item: RetrievedCredentialsForAnoncredItem,
     showCredentialSelection: () -> Unit,
     selectedCredentialId: String?,
 ) {
@@ -417,53 +436,62 @@ private fun RequestedItemCard(
 private fun DefaultPreview() {
     SudoDIEdgeAgentExampleTheme {
         ProofExchangePresentationScreenView(
-            presentationDetails = PresentationDetails(
+            presentationDetails = AnoncredPresentationDetails(
                 ProofExchange(
                     proofExchangeId = "proofEx1",
                     connectionId = "conn1",
                     initiator = ProofExchangeInitiator.EXTERNAL,
                     state = ProofExchangeState.REQUEST,
+                    formatData = ProofExchangeFormatData.Indy(
+                        AnoncredProofRequestInfo(
+                            "ProofReq",
+                            "1.0",
+                            requestedAttributes = mapOf(
+                                "1" to AnoncredProofRequestAttributeGroupInfo(
+                                    groupAttributes = listOf("gpa"), null, null,
+                                ),
+                                "2" to AnoncredProofRequestAttributeGroupInfo(
+                                    groupAttributes = listOf("dob", "gpa"), null, null,
+                                ),
+                            ),
+                            requestedPredicates = mapOf(
+                                "3" to AnoncredProofRequestPredicateInfo(
+                                    attributeName = "dob",
+                                    predicateType = AnoncredPredicateType.LESS_THAN,
+                                    predicateValue = 2000_09_21u, null, null,
+                                ),
+                                "4" to AnoncredProofRequestPredicateInfo(
+                                    attributeName = "gpa",
+                                    predicateType = AnoncredPredicateType.GREATER_THAN_OR_EQUAL,
+                                    predicateValue = 4u, null, null,
+                                ),
+                            ),
+                            null,
+                        ),
+                    ),
                     errorMessage = null,
                     listOf(),
                 ),
-                retrievedCredentials = RetrievedCredentials(
-                    requestedAttributes = listOf(
-                        RetrievedAttributeGroupCredentials(
-                            "1",
-                            groupAttributes = listOf("dob"),
-                            credentialIds = listOf("cred1", "cred2"),
-                        ),
-                        RetrievedAttributeGroupCredentials(
-                            "2",
-                            groupAttributes = listOf("dob", "gpa"),
-                            credentialIds = listOf("cred1", "cred2"),
-                        ),
+                retrievedCredentials = RetrievedPresentationCredentials.Indy(
+                    credentialsForRequestedAttributes =
+                    mapOf(
+                        "1" to listOf("cred1", "cred2"),
+                        "2" to listOf("cred1", "cred2"),
                     ),
-                    requestedPredicates = listOf(
-                        RetrievedPredicateCredentials(
-                            "3",
-                            attributeName = "dob",
-                            predicateType = PredicateType.LESS_THAN_OR_EQUAL,
-                            predicateValue = 2000_09_21,
-                            credentialIds = listOf("cred1", "cred2"),
-                        ),
-                        RetrievedPredicateCredentials(
-                            "4",
-                            attributeName = "gpa",
-                            predicateType = PredicateType.GREATER_THAN_OR_EQUAL,
-                            predicateValue = 4,
-                            credentialIds = listOf(),
-                        ),
+                    credentialsForRequestedPredicates =
+                    mapOf(
+                        "3" to listOf("cred1", "cred2"),
+                        "4" to listOf(),
                     ),
                 ),
                 credentialIdToAttributes = mapOf(
                     "cred1" to listOf(
-                        CredentialAttribute("dob", "val1"),
-                        CredentialAttribute("gpa", "val2"),
+                        AnoncredV1CredentialAttribute("dob", "val1"),
+                        AnoncredV1CredentialAttribute("gpa", "val2"),
                     ),
                     "cred2" to listOf(
-                        CredentialAttribute("dob", "val3"),
-                        CredentialAttribute("gpa", "val4"),
+                        AnoncredV1CredentialAttribute("dob", "val3"),
+                        AnoncredV1CredentialAttribute("gpa", "val4"),
                     ),
                 ),
             ),

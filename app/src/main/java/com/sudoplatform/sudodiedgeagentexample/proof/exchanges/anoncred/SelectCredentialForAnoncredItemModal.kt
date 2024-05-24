@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package com.sudoplatform.sudodiedgeagentexample.proof.exchanges
+package com.sudoplatform.sudodiedgeagentexample.proof.exchanges.anoncred
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -23,10 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialAttribute
+import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.RetrievedCredentialsForAnoncredItem
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 
@@ -39,24 +41,24 @@ import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SelectCredentialForItemModal(
+fun SelectCredentialForAnoncredItemModal(
     onDismissRequest: () -> Unit,
-    item: RetrievedCredentialsForItem,
+    item: RetrievedCredentialsForAnoncredItem,
     onSelect: (credentialId: String) -> Unit,
     /**
-     * Map of relevant credential IDs to the list of [CredentialAttribute]s
+     * Map of relevant credential IDs to the list of [AnoncredV1CredentialAttribute]s
      * belonging to that credential
      */
-    attributesByCredentialId: Map<String, List<CredentialAttribute>>,
+    attributesByCredentialId: Map<String, List<AnoncredV1CredentialAttribute>>,
 ) {
     /**
-     * For a given credentialId, get the list of [CredentialAttribute] of this credential
+     * For a given credentialId, get the list of [AnoncredV1CredentialAttribute] of this credential
      * which are relevant to the presentation [item].
      *
-     * For instance, if [item] is requesting attributes "A" & "B", only [CredentialAttribute]s
+     * For instance, if [item] is requesting attributes "A" & "B", only [AnoncredV1CredentialAttribute]s
      * for "A" & "B" should be returned.
      */
-    fun getRelevantCredentialAttributes(credentialId: String): List<CredentialAttribute> {
+    fun getRelevantCredentialAttributes(credentialId: String): List<AnoncredV1CredentialAttribute> {
         val relevantAttributeNames = item.requestedAttributeNames()
         val allAttributes = attributesByCredentialId[credentialId] ?: listOf()
         return allAttributes.filter { relevantAttributeNames.contains(it.name) }
@@ -64,7 +66,7 @@ fun SelectCredentialForItemModal(
 
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        sheetState = SheetState(skipPartiallyExpanded = true),
+        sheetState = SheetState(skipPartiallyExpanded = true, density = LocalDensity.current),
     ) {
         LazyColumn(
             Modifier
@@ -81,7 +83,7 @@ fun SelectCredentialForItemModal(
                     fontWeight = FontWeight.Bold,
                 )
             }
-            if (item.suitableCredentialIds().isEmpty()) {
+            if (item.suitableCredentialIds.isEmpty()) {
                 item {
                     Text(
                         text = "No suitable credentials found.",
@@ -91,7 +93,7 @@ fun SelectCredentialForItemModal(
                 }
             }
             items(
-                items = item.suitableCredentialIds(),
+                items = item.suitableCredentialIds,
                 key = { it },
             ) { item ->
                 val currentItem = rememberUpdatedState(item)

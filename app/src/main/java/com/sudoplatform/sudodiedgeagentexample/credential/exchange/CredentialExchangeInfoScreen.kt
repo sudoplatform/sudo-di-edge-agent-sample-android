@@ -29,14 +29,17 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.AcceptCredentialOfferConfiguration
+import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.AcceptCredentialOfferFormatSpecificConfiguration
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchange
+import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeInitiator
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeState
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialAttribute
+import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
+import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
-import com.sudoplatform.sudodiedgeagentexample.credential.CredentialInfoColumn
+import com.sudoplatform.sudodiedgeagentexample.credential.AnoncredCredentialInfoColumn
+import com.sudoplatform.sudodiedgeagentexample.credential.W3cCredentialInfoColumn
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
@@ -65,9 +68,16 @@ fun CredentialExchangeInfoScreen(
         scope.launch {
             isAcceptingCredential = true
             runCatching {
+                val holderDid = idempotentCreateHolderDidKey(agent)
+
                 agent.credentials.exchange.acceptOffer(
                     credentialExchangeId,
-                    AcceptCredentialOfferConfiguration(autoStoreCredential = true),
+                    AcceptCredentialOfferConfiguration(
+                        autoStoreCredential = true,
+                        formatSpecificConfiguration = AcceptCredentialOfferFormatSpecificConfiguration.AriesLdProofVc(
+                            overrideCredentialSubjectId = holderDid,
+                        ),
+                    ),
                 )
                 navController.popBackStack()
             }.showToastOnFailure(context, logger, "Failed to accept credential offer")
@@ -127,13 +137,23 @@ fun CredentialExchangeInfoScreenView(
                 }
             }
         } else {
-            CredentialInfoColumn(
-                Modifier.weight(1.0f),
-                id = credentialExchange.credentialExchangeId,
-                fromConnection = credentialExchange.connectionId,
-                metadata = credentialExchange.credentialMetadata,
-                attributes = credentialExchange.credentialAttributes,
-            )
+            when (val formatData = credentialExchange.formatData) {
+                is CredentialExchangeFormatData.Indy -> AnoncredCredentialInfoColumn(
+                    Modifier.weight(1.0f),
+                    id = credentialExchange.credentialExchangeId,
+                    fromConnection = credentialExchange.connectionId,
+                    metadata = formatData.credentialMetadata,
+                    attributes = formatData.credentialAttributes,
+                )
+                is CredentialExchangeFormatData.AriesLdProof -> W3cCredentialInfoColumn(
+                    Modifier.weight(1.0f),
+                    id = credentialExchange.credentialExchangeId,
+                    fromConnection = credentialExchange.connectionId,
+                    w3cCredential = formatData.currentProposedCredential,
+                    proofType = formatData.currentProposedProofType,
+                )
+            }
+
             if (credentialExchange.state == CredentialExchangeState.OFFER) {
                 Button(
                     onClick = { acceptCredential() },
@@ -158,15 +178,17 @@ private fun DefaultPreview() {
                 "conn1",
                 CredentialExchangeInitiator.EXTERNAL,
                 CredentialExchangeState.OFFER,
-                CredentialMetadata(
-                    "credDef1",
-                    CredentialDefinitionInfo("My Cred Def 1"),
-                    "schema1",
-                    SchemaInfo("My Schema 1", "1.0"),
-                ),
-                listOf(
-                    CredentialAttribute("Attribute 1", "Value 1", null),
-                    CredentialAttribute("Attribute 2", "Value 2", null),
+                CredentialExchangeFormatData.Indy(
+                    AnoncredV1CredentialMetadata(
+                        "credDef1",
+                        CredentialDefinitionInfo("My Cred Def 1"),
+                        "schema1",
+                        SchemaInfo("My Schema 1", "1.0"),
+                    ),
+                    listOf(
+                        AnoncredV1CredentialAttribute("Attribute 1", "Value 1", null),
+                        AnoncredV1CredentialAttribute("Attribute 2", "Value 2", null),
+                    ),
                 ),
                 null,
                 listOf(),

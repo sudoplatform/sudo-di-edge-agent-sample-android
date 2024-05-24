@@ -21,15 +21,18 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagentexample.connection.ConnectionsScreen
+import com.sudoplatform.sudodiedgeagentexample.connection.chat.ConnectionChatScreen
 import com.sudoplatform.sudodiedgeagentexample.connection.exchange.ConnectionExchangeScreen
+import com.sudoplatform.sudodiedgeagentexample.connection.exchange.ConnectionInvitationCreateScreen
 import com.sudoplatform.sudodiedgeagentexample.connection.exchange.ConnectionInvitationScannerScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.CredentialInfoScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.CredentialsScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.exchange.CredentialExchangeInfoScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.exchange.CredentialExchangeScreen
 import com.sudoplatform.sudodiedgeagentexample.home.HomeScreen
-import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.ProofExchangePresentationScreen
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.ProofExchangeScreen
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.anoncred.ProofExchangeAnoncredPresentationScreen
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.dif.ProofExchangeDifPresentationScreen
 import com.sudoplatform.sudodiedgeagentexample.register.RegisterScreen
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudologging.Logger
@@ -39,12 +42,17 @@ object Routes {
     const val HOME = "home"
     const val CONNECTION_EXCHANGES = "connExs"
     const val CONNECTION_INVITATION_SCANNER = "connInvitationScanner"
+    const val CONNECTION_INVITATION_CREATE = "connInvitationCreate"
     const val CONNECTIONS = "conns"
     const val CREDENTIAL_EXCHANGES = "credExs"
     const val CREDENTIAL_EXCHANGE_INFO = "credExInfo"
     const val CREDENTIALS = "creds"
     const val CREDENTIAL_INFO = "credInfo"
     const val PROOF_EXCHANGES = "proofExs"
+    const val CHAT = "chat"
+
+    const val PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE = "anoncred"
+    const val PROOF_EXCHANGE_PRESENTATION_DIF_TYPE = "dif"
     const val PROOF_EXCHANGE_PRESENTATION = "proofExPresentation"
 }
 
@@ -113,8 +121,17 @@ fun MainNavigation(
                 logger = logger,
             )
         }
+        composable(Routes.CONNECTION_INVITATION_CREATE) {
+            ConnectionInvitationCreateScreen(
+                navController = navController,
+                agent = agent,
+                sudoManager = sudoManager,
+                logger = logger,
+            )
+        }
         composable(Routes.CONNECTIONS) {
             ConnectionsScreen(
+                navController = navController,
                 agent = agent,
                 logger = logger,
             )
@@ -161,13 +178,36 @@ fun MainNavigation(
                 logger = logger,
             )
         }
-        composable("${Routes.PROOF_EXCHANGE_PRESENTATION}/{proofExId}") { backStackEntry ->
+        composable("${Routes.PROOF_EXCHANGE_PRESENTATION}/{proofType}/{proofExId}") { backStackEntry ->
             val proofExId = backStackEntry.arguments?.getString("proofExId")
             checkNotNull(proofExId)
+            val proofType = backStackEntry.arguments?.getString("proofType")
+            checkNotNull(proofType)
 
-            ProofExchangePresentationScreen(
-                navController = navController,
-                proofExchangeId = proofExId,
+            when (proofType) {
+                Routes.PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE -> ProofExchangeAnoncredPresentationScreen(
+                    navController = navController,
+                    proofExchangeId = proofExId,
+                    agent = agent,
+                    logger = logger,
+                )
+
+                Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE -> ProofExchangeDifPresentationScreen(
+                    navController = navController,
+                    proofExchangeId = proofExId,
+                    agent = agent,
+                    logger = logger,
+                )
+
+                else -> throw Exception("Unknown proof type route: $proofType")
+            }
+        }
+        composable("${Routes.CHAT}/{connectionId}") { backStackEntry ->
+            val connId = backStackEntry.arguments?.getString("connectionId")
+            checkNotNull(connId)
+
+            ConnectionChatScreen(
+                connectionId = connId,
                 agent = agent,
                 logger = logger,
             )

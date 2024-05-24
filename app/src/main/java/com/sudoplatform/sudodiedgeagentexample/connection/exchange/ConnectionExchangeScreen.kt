@@ -68,7 +68,7 @@ fun ConnectionExchangeScreen(
     val scope = rememberCoroutineScope()
 
     var isListLoading by remember { mutableStateOf(false) }
-    var isAcceptingInvitation by remember { mutableStateOf(false) }
+    var isAcceptingConnection by remember { mutableStateOf(false) }
     val connectionExchangeList = remember { mutableStateListOf<ConnectionExchange>() }
 
     /**
@@ -106,8 +106,8 @@ fun ConnectionExchangeScreen(
      * is then used to inform the connection peer how they should communicate to this
      * agent via the relay service.
      */
-    fun acceptConnection(id: String) = scope.launch {
-        isAcceptingInvitation = true
+    fun acceptInvitationConnection(id: String) = scope.launch {
+        isAcceptingConnection = true
 
         showToast("Accepting connection", context)
         runCatching {
@@ -122,7 +122,31 @@ fun ConnectionExchangeScreen(
             showToast("Connection accepted", context)
         }.showToastOnFailure(context, logger, "Failed to accept connection")
 
-        isAcceptingInvitation = false
+        isAcceptingConnection = false
+    }
+
+    /**
+     * Attempt to accept an inviter [ConnectionExchange] in the request state by its ID.
+     *
+     * This involves custom usage of tags to fetch the previously created [Postbox.serviceEndpoint]
+     * for this [ConnectionExchange], then construct it back into a [Routing], which is passed
+     * into the accept method. This eliminates the need to re-create another postbox.
+     */
+    fun acceptRequestConnection(id: String) = scope.launch {
+        isAcceptingConnection = true
+        showToast("Accepting connection", context)
+        runCatching {
+            val connEx = agent.connections.exchange.getById(id) ?: throw Exception("$id not found")
+            // reconstruct routing
+            val relayEndpoint = connEx.extractInviterRelayEndpointMetadata()
+                ?: throw Exception("failed to determine relay endpoint of inviter")
+            val routing = Routing(serviceEndpoint = relayEndpoint, emptyList())
+
+            agent.connections.exchange.acceptConnection(id, routing)
+
+            showToast("Connection accepted", context)
+        }.showToastOnFailure(context, logger, "Failed to accept connection")
+        isAcceptingConnection = false
     }
 
     /**
@@ -167,12 +191,14 @@ fun ConnectionExchangeScreen(
 
     ConnectionExchangeScreenView(
         isListLoading,
-        isAcceptingInvitation,
+        isAcceptingConnection,
         connectionExchangeList,
         refreshConnectionExchangeList = { refreshConnectionExchangeList() },
         deleteConnectionExchange = { deleteConnectionExchange(it) },
-        acceptConnectionInvitation = { acceptConnection(it) },
+        acceptConnectionInvitation = { acceptInvitationConnection(it) },
+        acceptConnectionRequest = { acceptRequestConnection(it) },
         navigateToInvitationScanner = { navController.navigate(Routes.CONNECTION_INVITATION_SCANNER) },
+        navigateToInvitationCreate = { navController.navigate(Routes.CONNECTION_INVITATION_CREATE) },
     )
 }
 
@@ -191,7 +217,9 @@ fun ConnectionExchangeScreenView(
     refreshConnectionExchangeList: () -> Unit,
     deleteConnectionExchange: (id: String) -> Unit,
     acceptConnectionInvitation: (id: String) -> Unit,
+    acceptConnectionRequest: (id: String) -> Unit,
     navigateToInvitationScanner: () -> Unit,
+    navigateToInvitationCreate: () -> Unit,
 ) {
     Column(
         Modifier
@@ -235,6 +263,7 @@ fun ConnectionExchangeScreenView(
                                 ConnectionExchangeItemCardContent(
                                     currentItem.value,
                                     acceptConnectionInvitation,
+                                    acceptConnectionRequest,
                                 )
                             }
                         }
@@ -256,6 +285,13 @@ fun ConnectionExchangeScreenView(
         ) {
             Text(text = "Scan Invitation")
         }
+        Button(
+            onClick = navigateToInvitationCreate,
+            Modifier.fillMaxWidth(),
+            enabled = !isAcceptingInvitation,
+        ) {
+            Text(text = "Create Invitation")
+        }
     }
 }
 
@@ -270,6 +306,7 @@ fun ConnectionExchangeScreenView(
 private fun ConnectionExchangeItemCardContent(
     item: ConnectionExchange,
     acceptConnectionInvitation: (id: String) -> Unit,
+    acceptConnectionRequest: (id: String) -> Unit,
 ) {
     Row(
         Modifier.padding(8.dp),
@@ -292,8 +329,19 @@ private fun ConnectionExchangeItemCardContent(
                     .replaceFirstChar { it.uppercase() },
             )
         }
-        if (item.state == ConnectionExchangeState.INVITATION) {
+        if (
+            item.state == ConnectionExchangeState.INVITATION &&
+            item.role == ConnectionExchangeRole.INVITEE
+        ) {
             Button(onClick = { acceptConnectionInvitation(item.connectionExchangeId) }) {
+                Text(text = "Accept")
+            }
+        }
+        if (
+            item.state == ConnectionExchangeState.REQUEST &&
+            item.role == ConnectionExchangeRole.INVITER
+        ) {
+            Button(onClick = { acceptConnectionRequest(item.connectionExchangeId) }) {
                 Text(text = "Accept")
             }
         }
@@ -314,7 +362,6 @@ private fun DefaultPreview() {
                     ConnectionExchangeRole.INVITEE,
                     ConnectionExchangeState.INVITATION,
                     "John",
-                    null,
                     "",
                     null,
                     listOf(),
@@ -325,12 +372,23 @@ private fun DefaultPreview() {
                     ConnectionExchangeRole.INVITEE,
                     ConnectionExchangeState.REQUEST,
                     "Doe",
+                    "",
                     null,
+                    listOf(),
+                ),
+                ConnectionExchange(
+                    "3",
+                    "conn1",
+                    ConnectionExchangeRole.INVITER,
+                    ConnectionExchangeState.REQUEST,
+                    "Doe",
                     "",
                     null,
                     listOf(),
                 ),
             ),
+            {},
+            {},
             {},
             {},
             {},
