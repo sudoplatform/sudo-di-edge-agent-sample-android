@@ -8,8 +8,6 @@ package com.sudoplatform.sudodiedgeagentexample.connection.exchange
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
-import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -45,15 +43,17 @@ import androidx.compose.ui.window.Popup
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
+import com.sudoplatform.sudodiedgeagent.connections.exchange.types.AcceptConnectionConfiguration
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchange
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeRole
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeState
+import com.sudoplatform.sudodiedgeagent.plugins.messagesource.UrlMessageSource
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
 import com.sudoplatform.sudodiedgeagent.types.Routing
 import com.sudoplatform.sudodiedgeagentexample.SingleSudoManager
 import com.sudoplatform.sudodiedgeagentexample.relay.SudoDIRelayMessageSource
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
-import com.sudoplatform.sudodiedgeagentexample.utils.makeReceivedMessageMetadata
+import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.showToast
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudodirelay.SudoDIRelayClient
@@ -124,13 +124,10 @@ fun ConnectionInvitationScannerScreen(
             if (incomingInvite != null) return@launch
 
             runCatching {
-                val scannedUri = Uri.parse(scannedString)
-                val base64Invitation = scannedUri.getQueryParameter("c_i")
-                    ?: throw Exception("Missing 'c_i' query parameter")
-
-                val invitation = Base64.decode(base64Invitation, Base64.URL_SAFE)
-
-                agent.receiveMessage(invitation, makeReceivedMessageMetadata())
+                val processor = UrlMessageSource(logger)
+                processor.queueUrlMessage(scannedString)
+                val msg = processor.getMessage() ?: throw Exception("No message found")
+                agent.receiveMessage(msg.body, msg.metadata)
             }.showToastOnFailure(
                 context,
                 logger,
@@ -140,14 +137,14 @@ fun ConnectionInvitationScannerScreen(
     }
 
     /**
-     * Attempt to accept a [ConnectionExchange] in the invitation state by its ID.
+     * Attempt to accept a [ConnectionExchange] by establishing a new connection.
      *
      * This involves creating a [Postbox] with the [SudoDIRelayClient], then using the
      * [SudoDIRelayMessageSource] to translate the [Postbox] into a [Routing], which
      * is then used to inform the connection peer how they should communicate to this
      * agent via the relay service.
      */
-    fun acceptConnection(id: String) = scope.launch {
+    fun acceptNewConnection(id: String) = scope.launch {
         showToast("Accepting connection", context)
         runCatching {
             isAcceptingInvitation = true
@@ -158,13 +155,41 @@ fun ConnectionInvitationScannerScreen(
 
             val routing = SudoDIRelayMessageSource.routingFromPostbox(postbox)
 
-            agent.connections.exchange.acceptConnection(id, routing)
+            agent.connections.exchange.acceptConnection(
+                id,
+                AcceptConnectionConfiguration.NewConnection(routing),
+            )
 
             showToast("Connection accepted", context)
             isAcceptingInvitation = false
             incomingInvite = null
             navController.popBackStack()
         }.showToastOnFailure(context, logger, "Failed to accept connection")
+
+        isAcceptingInvitation = false
+    }
+
+    /**
+     * Attempt to accept a [ConnectionExchange] by reusing an existing connection.
+     *
+     * This is possible when the invitation uses the same inviter DID that this agent
+     * has previously connected with, saving the effort/resources of creating a new connection.
+     */
+    fun tryReuseConnection(id: String, connectionId: String) = scope.launch {
+        showToast("Requesting to reuse connection", context)
+        runCatching {
+            isAcceptingInvitation = true
+
+            agent.connections.exchange.acceptConnection(
+                id,
+                AcceptConnectionConfiguration.ReuseExistingConnection(connectionId),
+            )
+
+            showToast("Connection reuse request sent", context)
+            isAcceptingInvitation = false
+            incomingInvite = null
+            navController.popBackStack()
+        }.showToastOnFailure(context, logger, "Failed to reuse connection")
 
         isAcceptingInvitation = false
     }
@@ -187,13 +212,17 @@ fun ConnectionInvitationScannerScreen(
     incomingInvite?.let { connEx ->
         AcceptInvitationAlertDialog(
             connEx,
-            onAccept = {
-                acceptConnection(connEx.connectionExchangeId)
-            },
-            isLoading = isAcceptingInvitation,
-            onClose = {
+            onReject = {
                 rejectConnection(connEx.connectionExchangeId)
             },
+            onAcceptReuseConnection = { connId ->
+                tryReuseConnection(connEx.connectionExchangeId, connId)
+            },
+            onAcceptNewConnection = {
+                acceptNewConnection(connEx.connectionExchangeId)
+            },
+            isLoading = isAcceptingInvitation,
+
         )
     }
 
@@ -243,7 +272,7 @@ fun ConnectionInvitationScannerScreen(
                             val selector = CameraSelector.Builder()
                                 .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                                 .build()
-                            preview.setSurfaceProvider(previewView.surfaceProvider)
+                            preview.surfaceProvider = previewView.surfaceProvider
                             val imageAnalysis = ImageAnalysis.Builder()
                                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                                 .build()
@@ -282,15 +311,18 @@ fun ConnectionInvitationScannerScreen(
 
 /**
  * [AlertDialog] which displays the details of an incoming [ConnectionExchange] (i.e. invitation).
- * Displays the option to accept or reject the connection.
+ * Displays the option to reuse (if possible), accept or reject the connection.
  */
 @Composable
 private fun AcceptInvitationAlertDialog(
     incomingConnEx: ConnectionExchange,
-    onClose: () -> Unit,
-    onAccept: () -> Unit,
+    onReject: () -> Unit,
+    onAcceptReuseConnection: (String) -> Unit,
+    onAcceptNewConnection: () -> Unit,
     isLoading: Boolean,
 ) {
+    var existingConnectionId: String? by remember { mutableStateOf(incomingConnEx.reusableConnectionIds.firstOrNull()) }
+
     if (isLoading) {
         Popup(alignment = Alignment.Center, onDismissRequest = {}) {
             CircularProgressIndicator()
@@ -298,19 +330,84 @@ private fun AcceptInvitationAlertDialog(
         return
     }
 
-    AlertDialog(
-        onDismissRequest = onClose,
-        confirmButton = {
-            TextButton(onClick = onAccept) {
-                Text(text = "Accept")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onClose) {
-                Text(text = "Cancel")
-            }
-        },
-        title = { Text(text = "Incoming Invitation") },
-        text = { Text(text = "From label: ${incomingConnEx.theirLabel}") },
-    )
+    fun declineReuse() {
+        existingConnectionId = null
+    }
+
+    when (val existingConn = existingConnectionId) {
+        is String -> AlertDialog(
+            onDismissRequest = { declineReuse() },
+            confirmButton = {
+                TextButton(onClick = { onAcceptReuseConnection(existingConn) }) {
+                    Text(text = "Reuse")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { declineReuse() }) {
+                    Text(text = "No")
+                }
+            },
+            title = { Text(text = "Incoming Invitation") },
+            text = {
+                Column {
+                    Text(text = "Looks like you already have a connection with this peer: '$existingConnectionId'")
+                    Text(text = "Do you wish to try reuse it?")
+                }
+            },
+        )
+
+        null -> AlertDialog(
+            onDismissRequest = onReject,
+            confirmButton = {
+                TextButton(onClick = onAcceptNewConnection) {
+                    Text(text = "Accept")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onReject) {
+                    Text(text = "Cancel")
+                }
+            },
+            title = { Text(text = "Incoming Invitation") },
+            text = {
+                Column {
+                    Text(text = "From label: ${incomingConnEx.theirLabel}")
+                    Text(text = "Create a new connection?")
+                }
+            },
+        )
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+private fun PopupPreview() {
+    SudoDIEdgeAgentExampleTheme {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .padding(SCREEN_PADDING),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AcceptInvitationAlertDialog(
+                incomingConnEx = ConnectionExchange(
+                    "connEx1",
+                    null,
+                    listOf("1"),
+                    ConnectionExchangeRole.INVITER,
+                    ConnectionExchangeState.REQUEST,
+                    did = "did:me",
+                    theirDid = "did:them",
+                    theirLabel = "Bob",
+                    errorMessage = null,
+                    tags = emptyList(),
+                ),
+                onReject = { },
+                onAcceptReuseConnection = { },
+                onAcceptNewConnection = { },
+                isLoading = false,
+            )
+        }
+    }
 }

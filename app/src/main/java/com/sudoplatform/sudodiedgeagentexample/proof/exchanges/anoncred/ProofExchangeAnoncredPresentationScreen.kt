@@ -19,6 +19,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -206,6 +207,14 @@ private fun ProofExchangePresentationScreenView(
     }
 
     /**
+     * Construct a map of self attested attributes as the user fills in the details for each item.
+     * This map is used to construct the [PresentationCredentials] when presenting.
+     */
+    val presentationSelfAttestations = remember {
+        mutableStateMapOf<String, String>()
+    }
+
+    /**
      * The presentation is determined as 'ready to present' once the user has selected
      * credentials for all requested items within [RetrievedPresentationCredentials].
      */
@@ -217,16 +226,21 @@ private fun ProofExchangePresentationScreenView(
         presentationDetails?.retrievedCredentials?.credentialsForRequestedPredicates?.all {
             presentationPredicates.contains(it.key)
         } ?: false
-    val readyToPresent = allAttributesSelected && allPredicatesSelected
+    val allSelfAttestationsMade =
+        presentationDetails?.retrievedCredentials?.selfAttestableAttributes?.all {
+            presentationSelfAttestations.contains(it)
+        } ?: false
+    val readyToPresent = allAttributesSelected && allPredicatesSelected && allSelfAttestationsMade
 
     /**
-     * Present the credentials that have been selected. Constructing a
-     * [PresentationCredentials] from the maps this composable has constructed.
+     * Present the credentials that have been selected, and all self-attestations made.
+     * Constructing a [PresentationCredentials] from the maps this composable has constructed.
      */
     fun presentSelectedCredentials() {
         val presentationCredentials = PresentationCredentials.Indy(
-            credentialsForRequestedAttributes = presentationAttributes.toMap(),
-            credentialsForRequestedPredicates = presentationPredicates.toMap(),
+            credentialsForRequestedAttributes = presentationAttributes,
+            credentialsForRequestedPredicates = presentationPredicates,
+            selfAttestedAttributes = presentationSelfAttestations,
         )
         present(presentationCredentials)
     }
@@ -383,6 +397,33 @@ private fun ProofExchangePresentationScreenView(
                         )
                     }
                 }
+                if (retrievedCreds.selfAttestableAttributes.isNotEmpty()) {
+                    item {
+                        Text(
+                            text = "Self Attestable Attributes",
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 16.dp),
+                            textAlign = TextAlign.Center,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+
+                    items(
+                        items = retrievedCreds.selfAttestableAttributes,
+                    ) { item ->
+                        val currentItem = rememberUpdatedState(newValue = item)
+                        val requestedAttribute =
+                            anoncredProofRequest.requestedAttributes[currentItem.value]!!
+                        val attributeName = requestedAttribute.groupAttributes.first()
+                        SelfAttestableItemCard(
+                            attributeName,
+                            onAttributeValueChange = { attributeValue ->
+                                presentationSelfAttestations[currentItem.value] = attributeValue
+                            },
+                        )
+                    }
+                }
             }
             Button(
                 onClick = { presentSelectedCredentials() },
@@ -393,7 +434,7 @@ private fun ProofExchangePresentationScreenView(
             }
             if (!readyToPresent) {
                 Text(
-                    text = "Select credentials for all items to present",
+                    text = "Select details for all items to present",
                     Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     fontStyle = FontStyle.Italic,
@@ -431,6 +472,34 @@ private fun RequestedItemCard(
     }
 }
 
+@Composable
+private fun SelfAttestableItemCard(
+    attributeName: String,
+    onAttributeValueChange: (String) -> Unit,
+) {
+    var inputText by remember { mutableStateOf("") }
+
+    Card(
+        Modifier
+            .padding(vertical = 4.dp)
+            .fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(8.dp)) {
+            Text(text = "$attributeName:")
+            TextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = inputText,
+                onValueChange = { newText ->
+                    inputText = newText
+                    onAttributeValueChange(newText)
+                },
+                placeholder = { Text(text = "Enter a value...") },
+                singleLine = true,
+            )
+        }
+    }
+}
+
 @Preview(showBackground = true)
 @Composable
 private fun DefaultPreview() {
@@ -452,6 +521,9 @@ private fun DefaultPreview() {
                                 ),
                                 "2" to AnoncredProofRequestAttributeGroupInfo(
                                     groupAttributes = listOf("dob", "gpa"), null, null,
+                                ),
+                                "5" to AnoncredProofRequestAttributeGroupInfo(
+                                    groupAttributes = listOf("favourite_color"), null, null,
                                 ),
                             ),
                             requestedPredicates = mapOf(
@@ -482,6 +554,9 @@ private fun DefaultPreview() {
                     mapOf(
                         "3" to listOf("cred1", "cred2"),
                         "4" to listOf(),
+                    ),
+                    selfAttestableAttributes = listOf(
+                        "5",
                     ),
                 ),
                 credentialIdToAttributes = mapOf(

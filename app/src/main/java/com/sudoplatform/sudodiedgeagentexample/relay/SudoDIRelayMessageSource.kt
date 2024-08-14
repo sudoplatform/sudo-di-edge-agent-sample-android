@@ -3,6 +3,7 @@ package com.sudoplatform.sudodiedgeagentexample.relay
 import com.sudoplatform.sudodiedgeagent.connections.exchange.ConnectionExchangeModule
 import com.sudoplatform.sudodiedgeagent.plugins.messagesource.Message
 import com.sudoplatform.sudodiedgeagent.plugins.messagesource.MessageSource
+import com.sudoplatform.sudodiedgeagent.plugins.messagesource.MessageSourceType
 import com.sudoplatform.sudodiedgeagent.plugins.messagesource.ReceivedMessageMetadata
 import com.sudoplatform.sudodiedgeagent.types.Routing
 import com.sudoplatform.sudodirelay.SudoDIRelayClient
@@ -50,6 +51,7 @@ class SudoDIRelayMessageSource(private val relayClient: SudoDIRelayClient, priva
         if (result != null) {
             val metadata = ReceivedMessageMetadata(
                 receivedTime = result.createdAt.toInstant(),
+                sourceType = MessageSourceType.RELAY,
             )
             return Message(result.id, result.message.toByteArray(), metadata)
         }

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
+import com.sudoplatform.sudodiedgeagent.connections.exchange.types.AcceptConnectionConfiguration
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchange
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeRole
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeState
@@ -78,7 +79,7 @@ fun ConnectionInvitationCreateScreen(
 
             val newRouting = Routing(postbox.serviceEndpoint, routingVerkeys = emptyList())
             val createdInvite = agent.connections.exchange.createInvitation(
-                CreateInvitationConfiguration.LegacyPairwise(newRouting),
+                CreateInvitationConfiguration.Pairwise(newRouting),
             )
             // apply tag of service endpoint which may need to be fetched later
             createdInvite.exchange.applyInviterRelayEndpointMetadata(agent, postbox.serviceEndpoint)
@@ -122,7 +123,10 @@ fun ConnectionInvitationCreateScreen(
             isAccepting = true
             val existingRouting = routing ?: throw Error("Invalid state. No routing initialized")
 
-            agent.connections.exchange.acceptConnection(id, existingRouting)
+            agent.connections.exchange.acceptConnection(
+                id,
+                AcceptConnectionConfiguration.NewConnection(existingRouting),
+            )
 
             showToast("Connection accepted", context)
             isAccepting = false
@@ -274,10 +278,12 @@ private fun Preview3() {
             incomingRequest = ConnectionExchange(
                 "connEx1",
                 null,
+                listOf(),
                 ConnectionExchangeRole.INVITER,
                 ConnectionExchangeState.REQUEST,
+                did = "did:me",
+                theirDid = "did:them",
                 theirLabel = "Bob",
-                verkey = "",
                 errorMessage = null,
                 tags = emptyList(),
             ),

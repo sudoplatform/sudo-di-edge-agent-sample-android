@@ -38,6 +38,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
+import com.sudoplatform.sudodiedgeagent.connections.exchange.types.AcceptConnectionConfiguration
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchange
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeRole
 import com.sudoplatform.sudodiedgeagent.connections.exchange.types.ConnectionExchangeState
@@ -117,7 +118,12 @@ fun ConnectionExchangeScreen(
 
             val routing = SudoDIRelayMessageSource.routingFromPostbox(postbox)
 
-            agent.connections.exchange.acceptConnection(id, routing)
+            agent.connections.exchange.acceptConnection(
+                id,
+                AcceptConnectionConfiguration.NewConnection(
+                    routing,
+                ),
+            )
 
             showToast("Connection accepted", context)
         }.showToastOnFailure(context, logger, "Failed to accept connection")
@@ -142,7 +148,10 @@ fun ConnectionExchangeScreen(
                 ?: throw Exception("failed to determine relay endpoint of inviter")
             val routing = Routing(serviceEndpoint = relayEndpoint, emptyList())
 
-            agent.connections.exchange.acceptConnection(id, routing)
+            agent.connections.exchange.acceptConnection(
+                id,
+                AcceptConnectionConfiguration.NewConnection(routing),
+            )
 
             showToast("Connection accepted", context)
         }.showToastOnFailure(context, logger, "Failed to accept connection")
@@ -176,7 +185,7 @@ fun ConnectionExchangeScreen(
 
                 if (connectionExchange.state == ConnectionExchangeState.COMPLETE) {
                     val msg =
-                        "Connection Exchange completed. A new connection can be found in the 'Connections' screen: ${connectionExchange.connectionId}"
+                        "Connection Exchange completed. The connection can be found in the 'Connections' screen: ${connectionExchange.connectionId}"
                     scope.launch {
                         showToast(msg, context)
                     }
@@ -359,30 +368,36 @@ private fun DefaultPreview() {
                 ConnectionExchange(
                     "1",
                     "conn1",
+                    listOf(),
                     ConnectionExchangeRole.INVITEE,
                     ConnectionExchangeState.INVITATION,
+                    "did:me",
+                    "did:them",
                     "John",
-                    "",
                     null,
                     listOf(),
                 ),
                 ConnectionExchange(
                     "2",
                     "conn1",
+                    listOf(),
                     ConnectionExchangeRole.INVITEE,
                     ConnectionExchangeState.REQUEST,
+                    "did:me",
+                    "did:them",
                     "Doe",
-                    "",
                     null,
                     listOf(),
                 ),
                 ConnectionExchange(
                     "3",
                     "conn1",
+                    listOf(),
                     ConnectionExchangeRole.INVITER,
                     ConnectionExchangeState.REQUEST,
+                    "did:me",
+                    "did:them",
                     "Doe",
-                    "",
                     null,
                     listOf(),
                 ),

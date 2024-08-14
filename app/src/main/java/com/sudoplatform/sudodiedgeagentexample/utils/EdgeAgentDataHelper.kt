@@ -5,12 +5,3 @@
  */
 
 package com.sudoplatform.sudodiedgeagentexample.utils
-
-import com.sudoplatform.sudodiedgeagent.plugins.messagesource.ReceivedMessageMetadata
-import java.time.Instant
-
-fun makeReceivedMessageMetadata(): ReceivedMessageMetadata {
-    return ReceivedMessageMetadata(
-        receivedTime = Instant.now(),
-    )
-}
