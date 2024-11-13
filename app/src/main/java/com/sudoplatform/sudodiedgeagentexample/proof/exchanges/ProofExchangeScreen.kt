@@ -39,8 +39,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeState
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.aries.AriesProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
 import com.sudoplatform.sudodiedgeagentexample.Routes
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
@@ -91,9 +91,13 @@ fun ProofExchangeScreen(
     }
 
     fun navigateToProofExchangePresentation(item: ProofExchange) {
-        val proofType = when (item.formatData) {
-            is ProofExchangeFormatData.Dif -> Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE
-            is ProofExchangeFormatData.Indy -> Routes.PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE
+        val proofType = when (item) {
+            is ProofExchange.Aries -> when (item.formatData) {
+                is AriesProofExchangeFormatData.Dif -> Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE
+                is AriesProofExchangeFormatData.Indy -> Routes.PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE
+            }
+            // openid4vp always with DIF
+            is ProofExchange.OpenId4Vc -> Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE
         }
         navController.navigate("${Routes.PROOF_EXCHANGE_PRESENTATION}/$proofType/${item.proofExchangeId}")
     }
@@ -140,9 +144,10 @@ fun ProofExchangeScreen(
  * UI for the "Proof Exchange screen". Allows viewing and managing
  * the [ProofExchange]s held by the agent.
  *
- * For [ProofExchange]s in the [ProofExchangeState.REQUEST] state, a "Present" button
- * will be shown, which when clicked will navigate to the [ProofExchangeAnoncredPresentationScreen]
- * where the presentation of that specific [ProofExchange] will be displayed.
+ * For [ProofExchange]s in the Request state, a "Present" button
+ * will be shown, which when clicked will navigate to the presentation screen
+ * where the presentation details and options of that specific [ProofExchange]
+ * will be displayed.
  */
 @Composable
 fun ProofExchangeScreenView(
@@ -236,7 +241,7 @@ private fun ProofExchangeItemCardContent(
                     .replaceFirstChar { it.uppercase() },
             )
         }
-        if (item.state == ProofExchangeState.REQUEST) {
+        if (item.state == ProofExchangeState.Aries.REQUEST || item.state == ProofExchangeState.OpenId4Vc.REQUEST) {
             Button(onClick = { showPresentationInfo() }) {
                 Text(text = "Present")
             }

@@ -6,6 +6,8 @@
 
 package com.sudoplatform.sudodiedgeagentexample
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -35,7 +38,9 @@ import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.anoncred.ProofExc
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.dif.ProofExchangeDifPresentationScreen
 import com.sudoplatform.sudodiedgeagentexample.register.RegisterScreen
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
+import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
+import kotlinx.coroutines.launch
 
 object Routes {
     const val REGISTER = "register"
@@ -65,6 +70,10 @@ class MainActivity : ComponentActivity() {
 
         app = this.application as App
 
+        intent?.data?.let { data ->
+            app.pendingDeepLinks.add(data)
+        }
+
         setContent {
             SudoDIEdgeAgentExampleTheme {
                 // A surface container using the 'background' color from the theme
@@ -72,8 +81,25 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    MainNavigation(app.agent, app.sudoManager, app.logger)
+                    MainNavigation(app.agent, app.sudoManager, app.logger, app.pendingDeepLinks)
                 }
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        intent.data?.let { data ->
+            // Filter for only schemes we care about
+            when (data.scheme) {
+                "didcomm", "openid-credential-offer", "openid", "openid4vp" -> {
+                    lifecycleScope.launch {
+                        runCatching {
+                            app.agent.receiveUrl(data.toString())
+                        }.showToastOnFailure(app, app.logger, "Failed to handle deeplink")
+                    }
+                }
+                else -> {}
             }
         }
     }
@@ -85,6 +111,7 @@ fun MainNavigation(
     agent: SudoDIEdgeAgent,
     sudoManager: SingleSudoManager,
     logger: Logger,
+    pendingDeepLinks: MutableList<Uri>,
 ) {
     val navController = rememberNavController()
 
@@ -103,6 +130,7 @@ fun MainNavigation(
                 agent = agent,
                 sudoManager = sudoManager,
                 logger = logger,
+                pendingDeepLinks = pendingDeepLinks,
             )
         }
         composable(Routes.CONNECTION_EXCHANGES) {

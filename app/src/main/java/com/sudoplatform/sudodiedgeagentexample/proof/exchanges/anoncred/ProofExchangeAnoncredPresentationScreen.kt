@@ -46,7 +46,6 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.AnoncredPresentati
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.AnoncredPresentationPredicate
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PresentationCredentials
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeInitiator
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeState
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedPresentationCredentials
@@ -54,6 +53,7 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredP
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestAttributeGroupInfo
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestInfo
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestPredicateInfo
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.aries.AriesProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.RetrievedCredentialsForAnoncredItem
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
@@ -299,10 +299,10 @@ private fun ProofExchangePresentationScreenView(
                 }
             }
         } else {
-            val proofEx = presentationDetails.proofExchange
+            val proofEx = presentationDetails.proofExchange as ProofExchange.Aries
             val retrievedCreds = presentationDetails.retrievedCredentials
             val anoncredProofRequest =
-                (proofEx.formatData as ProofExchangeFormatData.Indy).proofRequest
+                (proofEx.formatData as AriesProofExchangeFormatData.Indy).proofRequest
 
             LazyColumn(Modifier.weight(1.0f)) {
                 item {
@@ -506,12 +506,12 @@ private fun DefaultPreview() {
     SudoDIEdgeAgentExampleTheme {
         ProofExchangePresentationScreenView(
             presentationDetails = AnoncredPresentationDetails(
-                ProofExchange(
+                ProofExchange.Aries(
                     proofExchangeId = "proofEx1",
                     connectionId = "conn1",
                     initiator = ProofExchangeInitiator.EXTERNAL,
-                    state = ProofExchangeState.REQUEST,
-                    formatData = ProofExchangeFormatData.Indy(
+                    state = ProofExchangeState.Aries.REQUEST,
+                    formatData = AriesProofExchangeFormatData.Indy(
                         AnoncredProofRequestInfo(
                             "ProofReq",
                             "1.0",
@@ -542,7 +542,7 @@ private fun DefaultPreview() {
                         ),
                     ),
                     errorMessage = null,
-                    listOf(),
+                    tags = listOf(),
                 ),
                 retrievedCredentials = RetrievedPresentationCredentials.Indy(
                     credentialsForRequestedAttributes =

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,10 +29,11 @@ fun NameValueTextRow(
         vertical = 2.dp,
     ),
     handleValueTextOverflow: Boolean = false,
+    color: Color = Color.Unspecified,
 ) {
     val maxLines = if (handleValueTextOverflow) { 1 } else { Int.MAX_VALUE }
     Row(modifier = modifier) {
-        Text(text = "$name: ", fontWeight = FontWeight.Bold)
-        Text(text = value, maxLines = maxLines, overflow = TextOverflow.Ellipsis)
+        Text(text = "$name: ", fontWeight = FontWeight.Bold, color = color)
+        Text(text = value, maxLines = maxLines, overflow = TextOverflow.Ellipsis, color = color)
     }
 }

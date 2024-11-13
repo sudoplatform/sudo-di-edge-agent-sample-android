@@ -31,14 +31,19 @@ import androidx.compose.ui.unit.dp
 import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
+import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Field
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Filter
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptor
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorSchema
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.StringOrNumber
+import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
+import com.sudoplatform.sudodiedgeagentexample.credential.AnoncredCredentialInfoColumn
+import com.sudoplatform.sudodiedgeagentexample.credential.SdJwtCredentialInfoColumn
+import com.sudoplatform.sudodiedgeagentexample.credential.W3cCredentialInfoColumn
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.asString
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
@@ -46,6 +51,7 @@ import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Modal bottom sheet view for displaying the list of credentials which are appropriate
@@ -57,7 +63,7 @@ import kotlinx.serialization.json.JsonPrimitive
 @Composable
 fun SelectCredentialForDifItemModal(
     onDismissRequest: () -> Unit,
-    descriptor: InputDescriptor,
+    descriptor: InputDescriptorV2,
     suitableCredentials: List<Credential>,
     onSelect: (credentialId: String) -> Unit,
 ) {
@@ -80,7 +86,7 @@ fun SelectCredentialForDifItemModal(
                 )
                 NameValueTextColumn(name = "Name", value = descriptor.name ?: "None")
                 NameValueTextColumn(name = "Purpose", value = descriptor.purpose ?: "None")
-                descriptor.constraints?.fields?.forEachIndexed { index, field ->
+                descriptor.constraints.fields.forEachIndexed { index, field ->
                     NameValueTextRow(name = "Constraint #$index", value = "")
                     NameValueTextColumn(
                         name = "Constraint Purpose",
@@ -101,13 +107,19 @@ fun SelectCredentialForDifItemModal(
                         NameValueTextColumn(name = "required minimum value", value = it.asString())
                     }
                     field.filter?.exclusiveMinimum?.let {
-                        NameValueTextColumn(name = "required exclusiveMinimum value", value = it.asString())
+                        NameValueTextColumn(
+                            name = "required exclusiveMinimum value",
+                            value = it.asString(),
+                        )
                     }
                     field.filter?.maximum?.let {
                         NameValueTextColumn(name = "required maximum value", value = it.asString())
                     }
                     field.filter?.exclusiveMaximum?.let {
-                        NameValueTextColumn(name = "required exclusiveMaximum value", value = it.asString())
+                        NameValueTextColumn(
+                            name = "required exclusiveMaximum value",
+                            value = it.asString(),
+                        )
                     }
                     field.filter?.minLength?.let {
                         NameValueTextColumn(name = "required minLength", value = it.toString())
@@ -119,10 +131,16 @@ fun SelectCredentialForDifItemModal(
                         NameValueTextColumn(name = "required const value", value = it.asString())
                     }
                     field.filter?.enum?.let {
-                        NameValueTextColumn(name = "required enum value", value = it.map { x -> x.asString() }.toString())
+                        NameValueTextColumn(
+                            name = "required enum value",
+                            value = it.map { x -> x.asString() }.toString(),
+                        )
                     }
                     field.filter?.not?.let {
                         NameValueTextColumn(name = "required not filter", value = it.toString())
+                    }
+                    field.filter?.other?.let {
+                        NameValueTextColumn(name = "required other filter", value = it.toString())
                     }
                 }
 
@@ -151,8 +169,6 @@ fun SelectCredentialForDifItemModal(
                 key = { it.credentialId },
             ) { item ->
                 val currentItem = rememberUpdatedState(item)
-                val w3cCredential =
-                    (currentItem.value.formatData as CredentialFormatData.W3C).credential
 
                 Card(Modifier.padding(vertical = 4.dp)) {
                     Row(
@@ -160,23 +176,25 @@ fun SelectCredentialForDifItemModal(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1.0f)) {
-                            NameValueTextRow(
-                                name = "ID",
-                                value = currentItem.value.credentialId,
-                                handleValueTextOverflow = true,
-                            )
-                            NameValueTextRow("Issuer", w3cCredential.issuer.id)
-                            NameValueTextRow("Issuance Date", w3cCredential.issuanceDate)
-                            NameValueTextRow(
-                                "Type",
-                                w3cCredential.types.find { it != "VerifiableCredential" } ?: "",
-                            )
-                            w3cCredential.credentialSubject.forEach { credSubject ->
-                                NameValueTextRow(name = "Subject", value = "")
-                                NameValueTextRow(name = "ID", value = credSubject.id ?: "None")
-                                credSubject.properties.toList().forEach { (k, v) ->
-                                    NameValueTextRow(name = k, value = v.toString())
-                                }
+                            when (val data = currentItem.value.formatData) {
+                                is CredentialFormatData.AnoncredV1 -> AnoncredCredentialInfoColumn(
+                                    id = currentItem.value.credentialId,
+                                    fromSource = currentItem.value.credentialSource,
+                                    metadata = data.credentialMetadata,
+                                    attributes = data.credentialAttributes,
+                                )
+
+                                is CredentialFormatData.SdJwtVc -> SdJwtCredentialInfoColumn(
+                                    id = currentItem.value.credentialId,
+                                    fromSource = currentItem.value.credentialSource,
+                                    sdJwtVc = data.credential,
+                                )
+
+                                is CredentialFormatData.W3C -> W3cCredentialInfoColumn(
+                                    id = currentItem.value.credentialId,
+                                    fromSource = currentItem.value.credentialSource,
+                                    w3cCredential = data.credential,
+                                )
                             }
                             Button(
                                 onClick = { onSelect(currentItem.value.credentialId) },
@@ -197,13 +215,60 @@ fun SelectCredentialForDifItemModal(
 @Preview(showBackground = true)
 @Composable
 private fun DefaultPreview() {
+    val w3cCred = Credential(
+        "cred1",
+        "",
+        CredentialSource.DidCommConnection("conn1"),
+        formatData = CredentialFormatData.W3C(
+            W3cCredential(
+                contexts = listOf(),
+                null,
+                types = listOf("Sample"),
+                credentialSubject = listOf(
+                    CredentialSubject(
+                        id = "did:example:123",
+                        properties = JsonObject(
+                            mapOf(
+                                "givenName" to JsonPrimitive("John Smith"),
+                            ),
+                        ),
+                    ),
+                ),
+                issuer = CredentialIssuer(
+                    "did:example:issuer123",
+                    JsonObject(emptyMap()),
+                ),
+                issuanceDate = "2024-02-12T15:30:45.123Z",
+                null,
+                proof = null,
+                properties = JsonObject(mapOf()),
+            ),
+        ),
+        listOf(),
+    )
+    val sdJwtVc = Credential(
+        "cred1",
+        "",
+        CredentialSource.OpenId4VcIssuer("did:foo:issuer"),
+        formatData = CredentialFormatData.SdJwtVc(
+            SdJwtVerifiableCredential(
+                compactSdJwt = "foo.bar.xyz",
+                verifiableCredentialType = "accumsan",
+                issuer = "expetenda",
+                validAfter = null,
+                validBefore = null,
+                issuedAt = null,
+                keyBinding = mapOf(),
+                claims = mapOf("foo" to SdJsonElement.Primitive(false, JsonPrimitive("bar"))),
+            ),
+        ),
+        listOf(),
+    )
     SudoDIEdgeAgentExampleTheme {
         SelectCredentialForDifItemModal(
             onDismissRequest = { },
-            descriptor = InputDescriptor(
+            descriptor = InputDescriptorV2(
                 "1",
-                schema = InputDescriptorSchema.Schemas(listOf()),
-                listOf(),
                 name = "Proof of Residency",
                 purpose = "Prove you are a resident",
                 constraints = Constraints(
@@ -230,44 +295,19 @@ private fun DefaultPreview() {
                                 StringOrNumber.StringValue("Bob"),
                                 null,
                                 null,
+                                buildJsonObject { },
                             ),
                             predicate = null,
+                            name = "Given Name",
+                            optional = null,
                         ),
                     ),
                 ),
             ),
             suitableCredentials = listOf(
-                Credential(
-                    "cred1",
-                    "",
-                    "conn1",
-                    formatData = CredentialFormatData.W3C(
-                        W3cCredential(
-                            contexts = listOf(),
-                            null,
-                            types = listOf("Sample"),
-                            credentialSubject = listOf(
-                                CredentialSubject(
-                                    id = "did:example:123",
-                                    properties = JsonObject(
-                                        mapOf(
-                                            "givenName" to JsonPrimitive("John Smith"),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                            issuer = CredentialIssuer(
-                                "did:example:issuer123",
-                                JsonObject(emptyMap()),
-                            ),
-                            issuanceDate = "2024-02-12T15:30:45.123Z",
-                            null,
-                            proof = null,
-                            properties = JsonObject(mapOf()),
-                        ),
-                    ),
-                    listOf(),
-                ),
+                w3cCred,
+                w3cCred.copy(credentialId = "2"),
+                sdJwtVc.copy(credentialId = "3"),
             ),
             onSelect = {},
         )

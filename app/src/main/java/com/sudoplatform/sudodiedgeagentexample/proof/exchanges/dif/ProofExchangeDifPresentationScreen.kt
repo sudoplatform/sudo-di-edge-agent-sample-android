@@ -41,17 +41,20 @@ import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PresentationCredentials
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeInitiator
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeState
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedPresentationCredentials
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptor
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorSchema
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinition
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.aries.AriesProofExchangeFormatData
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV1
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV2
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.getPresentationDefinitionV2
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
@@ -66,6 +69,7 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 data class DifPresentationDetails(
     val proofExchange: ProofExchange,
+    val request: PresentationDefinitionV2,
     val credentialsForRequestedDescriptors: Map<String, List<Credential>>,
 )
 
@@ -109,6 +113,10 @@ fun ProofExchangeDifPresentationScreen(
         runCatching {
             val proofEx = agent.proofs.exchange.getById(proofExchangeId)
                 ?: throw Exception("Could not find proof exchange")
+
+            val request = proofEx.getPresentationDefinitionV2()
+                ?: throw Exception("ProofExchange is not DIF-based")
+
             val retrievedCredentials =
                 agent.proofs.exchange.retrieveCredentialsForProofRequest(proofExchangeId) as RetrievedPresentationCredentials.Dif
 
@@ -124,8 +132,9 @@ fun ProofExchangeDifPresentationScreen(
 
             presentationDetails =
                 DifPresentationDetails(
-                    proofEx,
-                    credentialsForRequestedDescriptors,
+                    proofExchange = proofEx,
+                    request = request,
+                    credentialsForRequestedDescriptors = credentialsForRequestedDescriptors,
                 )
         }.showToastOnFailure(context, logger, "Failed to load proof exchange")
     }
@@ -167,7 +176,7 @@ fun ProofExchangeDifPresentationScreenView(
      * When not null, indicates that the user is in the process of selecting a credential
      * of the item.
      */
-    var selectingCredentialForDescriptor: InputDescriptor? by remember {
+    var selectingCredentialForDescriptor: InputDescriptorV2? by remember {
         mutableStateOf(null)
     }
 
@@ -237,8 +246,7 @@ fun ProofExchangeDifPresentationScreenView(
             }
         } else {
             val proofEx = presentationDetails.proofExchange
-            val difPresDef =
-                (proofEx.formatData as ProofExchangeFormatData.Dif).requestedPresentationDefinition
+            val difPresDef = presentationDetails.request
             val retrievedCreds = presentationDetails.credentialsForRequestedDescriptors
 
             LazyColumn(Modifier.weight(1.0f)) {
@@ -256,7 +264,17 @@ fun ProofExchangeDifPresentationScreenView(
                             .padding(vertical = 16.dp),
                     ) {
                         NameValueTextColumn("ID", proofEx.proofExchangeId)
-                        NameValueTextColumn("From Connection", proofEx.connectionId)
+                        when (proofEx) {
+                            is ProofExchange.Aries -> NameValueTextColumn(
+                                "From Connection",
+                                proofEx.connectionId,
+                            )
+
+                            is ProofExchange.OpenId4Vc -> NameValueTextColumn(
+                                "From Verifier",
+                                proofEx.verifierId,
+                            )
+                        }
                     }
                     HorizontalDivider()
                 }
@@ -309,7 +327,7 @@ fun ProofExchangeDifPresentationScreenView(
  */
 @Composable
 private fun RequestedItemCard(
-    inputDescriptor: InputDescriptor,
+    inputDescriptor: InputDescriptorV2,
     showCredentialSelection: () -> Unit,
     selectedCredentialId: String?,
 ) {
@@ -340,38 +358,50 @@ private fun DefaultPreview() {
     SudoDIEdgeAgentExampleTheme {
         ProofExchangeDifPresentationScreenView(
             presentationDetails = DifPresentationDetails(
-                ProofExchange(
+                ProofExchange.Aries(
                     proofExchangeId = "proofEx1",
                     connectionId = "conn1",
                     initiator = ProofExchangeInitiator.EXTERNAL,
-                    state = ProofExchangeState.REQUEST,
-                    formatData = ProofExchangeFormatData.Dif(
-                        PresentationDefinition(
+                    state = ProofExchangeState.Aries.REQUEST,
+                    formatData = AriesProofExchangeFormatData.Dif(
+                        PresentationDefinitionV1(
                             id = "1",
-                            name = "Presentation Definition",
-                            purpose = "Please present",
-                            inputDescriptors = listOf(
-                                InputDescriptor(
-                                    "1",
-                                    schema = InputDescriptorSchema.Schemas(listOf()),
-                                    listOf(),
-                                    name = "Proof of Residency",
-                                    purpose = "Prove you are a resident",
-                                    constraints = null,
-                                ),
-                            ),
+                            name = "Dummy",
+                            purpose = "dummy",
+                            inputDescriptors = listOf(),
                             submissionRequirements = listOf(),
                         ),
                     ),
                     errorMessage = null,
-                    listOf(),
+                    tags = listOf(),
+                ),
+                request = PresentationDefinitionV2(
+                    id = "1",
+                    name = "Presentation Definition",
+                    purpose = "Please present",
+                    inputDescriptors = listOf(
+                        InputDescriptorV2(
+                            "1",
+                            name = "Proof of Residency",
+                            purpose = "Prove you are a resident",
+                            constraints = Constraints(
+                                limitDisclosure = null,
+                                statuses = null,
+                                subjectIsIssuer = null,
+                                isHolder = listOf(),
+                                sameSubject = listOf(),
+                                fields = listOf(),
+                            ),
+                        ),
+                    ),
+                    submissionRequirements = listOf(),
                 ),
                 credentialsForRequestedDescriptors = mapOf(
                     "1" to listOf(
                         Credential(
                             "cred1",
                             "",
-                            "conn1",
+                            CredentialSource.DidCommConnection("conn1"),
                             formatData = CredentialFormatData.W3C(
                                 W3cCredential(
                                     contexts = listOf(),

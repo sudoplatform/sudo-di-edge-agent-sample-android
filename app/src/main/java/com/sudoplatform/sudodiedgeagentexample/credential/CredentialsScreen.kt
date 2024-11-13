@@ -42,6 +42,7 @@ import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagentexample.Routes
@@ -209,6 +210,11 @@ private fun CredentialItemCardContent(
                         ?: "VerifiableCredential",
                     "W3C",
                 )
+
+                is CredentialFormatData.SdJwtVc -> Pair(
+                    data.credential.verifiableCredentialType,
+                    "SD-JWT VC",
+                )
             }
             Text(
                 text = credName,
@@ -233,7 +239,7 @@ private fun DefaultPreview() {
                 Credential(
                     "1",
                     "conn1",
-                    "John",
+                    CredentialSource.DidCommConnection("John"),
                     CredentialFormatData.AnoncredV1(
                         AnoncredV1CredentialMetadata(
                             "",
@@ -248,7 +254,7 @@ private fun DefaultPreview() {
                 Credential(
                     "2",
                     "conn1",
-                    "John",
+                    CredentialSource.OpenId4VcIssuer("https://issuer.john"),
                     CredentialFormatData.W3C(
                         W3cCredential(
                             contexts = emptyList(),

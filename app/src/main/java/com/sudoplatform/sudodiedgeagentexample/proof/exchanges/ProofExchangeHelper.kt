@@ -10,6 +10,12 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredPredicateType
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestAttributeGroupInfo
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredProofRequestPredicateInfo
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.aries.AriesProofExchangeFormatData
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV1
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV1
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV2
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.StringOrNumber
 
 /**
@@ -88,4 +94,48 @@ fun StringOrNumber.asString(): String {
         is StringOrNumber.Number -> value.toString()
         is StringOrNumber.StringValue -> value
     }
+}
+
+/**
+ * get the [PresentationDefinitionV2] attached to this [ProofExchange] (if any).
+ * [PresentationDefinitionV1]s are converted to [PresentationDefinitionV2] if needed.
+ */
+fun ProofExchange.getPresentationDefinitionV2(): PresentationDefinitionV2? {
+    return when (this) {
+        is ProofExchange.Aries -> when (val data = formatData) {
+            is AriesProofExchangeFormatData.Dif -> data.requestedPresentationDefinition.toV2()
+            is AriesProofExchangeFormatData.Indy -> null
+        }
+
+        is ProofExchange.OpenId4Vc -> presentationRequest
+    }
+}
+
+private fun PresentationDefinitionV1.toV2(): PresentationDefinitionV2 {
+    return PresentationDefinitionV2(
+        id = id ?: "N/A",
+        inputDescriptors = inputDescriptors.map { it.toV2() },
+        name = name,
+        purpose = purpose,
+        submissionRequirements = submissionRequirements,
+
+    )
+}
+
+private fun InputDescriptorV1.toV2(): InputDescriptorV2 {
+    return InputDescriptorV2(
+        id = id,
+        name = name,
+        purpose = purpose,
+        constraints = constraints ?: Constraints(
+            limitDisclosure = null,
+            statuses = null,
+            subjectIsIssuer = null,
+            isHolder = listOf(),
+            sameSubject = listOf(),
+            fields = listOf(),
+
+        ),
+        group = group,
+    )
 }

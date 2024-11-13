@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -26,9 +27,10 @@ fun NameValueTextColumn(
     @SuppressLint("ModifierParameter") modifier: Modifier = Modifier.padding(
         vertical = 2.dp,
     ),
+    color: Color = Color.Unspecified,
 ) {
     Column(modifier = modifier) {
-        Text(text = "$name:", fontWeight = FontWeight.Bold)
-        Text(text = value)
+        Text(text = "$name:", fontWeight = FontWeight.Bold, color = color)
+        Text(text = value, color = color)
     }
 }

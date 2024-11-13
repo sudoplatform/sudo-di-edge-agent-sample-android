@@ -8,6 +8,7 @@ package com.sudoplatform.sudodiedgeagentexample
 
 import android.app.Application
 import android.content.Context
+import android.net.Uri
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.configuration.AgentConfiguration
 import com.sudoplatform.sudodiedgeagent.configuration.PeerConnectionConfiguration
@@ -30,6 +31,12 @@ class App : Application() {
      * make use of the single sudo that is being used.
      */
     lateinit var sudoManager: SingleSudoManager
+
+    /**
+     * Set of pending deep links captured by the app/intent which have not handled yet.
+     * This may include `openid://` related deeplinks for credential & proof exchanges.
+     */
+    var pendingDeepLinks: MutableList<Uri> = mutableListOf()
 
     companion object {
         private const val LEDGER_GENESIS_FILE_NAME = "ledger_genesis.json"

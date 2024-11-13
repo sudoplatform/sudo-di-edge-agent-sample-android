@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,17 +30,21 @@ import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
+import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
 import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProof
 import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
 import com.sudoplatform.sudodiedgeagent.credentials.types.ProofPurpose
 import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
+import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
+import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -86,31 +91,41 @@ fun CredentialInfoScreenView(credential: Credential?) {
             .fillMaxSize()
             .padding(SCREEN_PADDING),
     ) {
-        if (credential == null) {
-            Column(
-                Modifier.fillMaxSize(),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                CircularProgressIndicator(Modifier.padding(vertical = 8.dp))
-            }
-        } else {
-            when (val formatData = credential.formatData) {
-                is CredentialFormatData.AnoncredV1 -> AnoncredCredentialInfoColumn(
-                    Modifier.weight(1.0f),
-                    id = credential.credentialId,
-                    fromConnection = credential.connectionId,
-                    metadata = formatData.credentialMetadata,
-                    attributes = formatData.credentialAttributes,
-                )
+        LazyColumn(Modifier.weight(1.0f)) {
+            item {
+                if (credential == null) {
+                    Column(
+                        Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        CircularProgressIndicator(Modifier.padding(vertical = 8.dp))
+                    }
+                } else {
+                    when (val formatData = credential.formatData) {
+                        is CredentialFormatData.AnoncredV1 -> AnoncredCredentialInfoColumn(
+                            Modifier.weight(1.0f),
+                            id = credential.credentialId,
+                            fromSource = credential.credentialSource,
+                            metadata = formatData.credentialMetadata,
+                            attributes = formatData.credentialAttributes,
+                        )
 
-                is CredentialFormatData.W3C -> W3cCredentialInfoColumn(
-                    Modifier.weight(1.0f),
-                    id = credential.credentialId,
-                    fromConnection = credential.connectionId,
-                    w3cCredential = formatData.credential,
-                    proofType = formatData.credential.proof?.firstOrNull()?.proofType,
-                )
+                        is CredentialFormatData.W3C -> W3cCredentialInfoColumn(
+                            id = credential.credentialId,
+                            fromSource = credential.credentialSource,
+                            w3cCredential = formatData.credential,
+                            proofType = formatData.credential.proof?.firstOrNull()?.proofType,
+                        )
+
+                        is CredentialFormatData.SdJwtVc -> SdJwtCredentialInfoColumn(
+                            Modifier.weight(1.0f),
+                            id = credential.credentialId,
+                            fromSource = credential.credentialSource,
+                            sdJwtVc = formatData.credential,
+                        )
+                    }
+                }
             }
         }
     }
@@ -124,7 +139,7 @@ private fun PreviewAnoncred() {
             credential = Credential(
                 "cred1",
                 "credEx1",
-                "conn1",
+                CredentialSource.DidCommConnection("conn1"),
                 CredentialFormatData.AnoncredV1(
                     AnoncredV1CredentialMetadata(
                         "credDef1",
@@ -146,32 +161,35 @@ private fun PreviewAnoncred() {
 @Preview(showBackground = true)
 @Composable
 private fun PreviewW3c() {
+    val sub = CredentialSubject(
+        "did:foo:holder1",
+        properties = buildJsonObject {
+            put("attribute 1", "value 1")
+            put("attribute 2", 2)
+            putJsonObject("attribute 3") {
+                put("attribute 3.1", 3.1)
+                putJsonArray("attributes 3.2") {
+                    add(3.2)
+                    add("3.2")
+                }
+            }
+        },
+    )
     SudoDIEdgeAgentExampleTheme {
         CredentialInfoScreenView(
             credential = Credential(
                 "cred1",
                 "credEx1",
-                "conn1",
+                CredentialSource.OpenId4VcIssuer("https://issuer.com"),
                 CredentialFormatData.W3C(
                     W3cCredential(
                         contexts = emptyList(),
                         id = null,
                         types = listOf("Foobar"),
                         credentialSubject = listOf(
-                            CredentialSubject(
-                                "did:foo:holder1",
-                                properties = buildJsonObject {
-                                    put("attribute 1", "value 1")
-                                    put("attribute 2", 2)
-                                    putJsonObject("attribute 3") {
-                                        put("attribute 3.1", 3.1)
-                                        putJsonArray("attributes 3.2") {
-                                            add(3.2)
-                                            add("3.2")
-                                        }
-                                    }
-                                },
-                            ),
+                            sub,
+                            sub,
+                            sub,
                         ),
                         issuer = CredentialIssuer("did:foo:issuer1", JsonObject(emptyMap())),
                         issuanceDate = "2018-04-01T15:20:15Z",
@@ -188,6 +206,36 @@ private fun PreviewW3c() {
                             ),
                         ),
                         properties = JsonObject(emptyMap()),
+                    ),
+                ),
+                listOf(),
+            ),
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun PreviewSdJwt() {
+    SudoDIEdgeAgentExampleTheme {
+        CredentialInfoScreenView(
+            credential = Credential(
+                "cred1",
+                "credEx1",
+                CredentialSource.OpenId4VcIssuer("https://issuer.com"),
+                CredentialFormatData.SdJwtVc(
+                    SdJwtVerifiableCredential(
+                        compactSdJwt = "j.w.t~",
+                        verifiableCredentialType = "UniversityDegree",
+                        issuer = "did:foo:bar",
+                        validAfter = null,
+                        validBefore = null,
+                        issuedAt = 1727244595u,
+                        keyBinding = null,
+                        claims = mapOf(
+                            "code" to SdJsonElement.Primitive(true, JsonPrimitive("Math")),
+                            "gpa" to SdJsonElement.Primitive(true, JsonPrimitive(4)),
+                        ),
                     ),
                 ),
                 listOf(),

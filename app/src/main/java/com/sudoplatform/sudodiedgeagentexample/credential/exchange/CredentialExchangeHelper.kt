@@ -9,6 +9,7 @@ package com.sudoplatform.sudodiedgeagentexample.credential.exchange
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchange
 import com.sudoplatform.sudodiedgeagent.dids.types.CreateDidOptions
+import com.sudoplatform.sudodiedgeagent.dids.types.DidInformation
 import com.sudoplatform.sudodiedgeagent.dids.types.DidKeyType
 import com.sudoplatform.sudodiedgeagent.dids.types.DidMethod
 import com.sudoplatform.sudodiedgeagent.dids.types.ListDidsFilters
@@ -29,19 +30,33 @@ fun List<CredentialExchange>.trySortByDateDescending(): List<CredentialExchange>
 }
 
 /**
- * Creates an Ed25519 DID:KEY if one does not already exists.
+ * Creates a DID:KEY of the specific [keyType] if one does not already exists.
  *
  * Returns the new or existing did:key DID
  */
-suspend fun idempotentCreateHolderDidKey(agent: SudoDIEdgeAgent): String {
+suspend fun idempotentCreateHolderDidKey(agent: SudoDIEdgeAgent, keyType: DidKeyType): String {
     val dids = agent.dids.listAll(ListDidsOptions(ListDidsFilters(method = DidMethod.DID_KEY)))
 
-    val existingDid = dids.firstOrNull()
+    val existingDid = dids.firstOrNull { did -> isDidOfKeyType(did, keyType) }
 
     if (existingDid != null) {
         return existingDid.did
     }
 
-    val newDid = agent.dids.createDid(CreateDidOptions.DidKey(keyType = DidKeyType.ED25519))
+    val newDid = agent.dids.createDid(CreateDidOptions.DidKey(keyType = keyType))
     return newDid.did
+}
+
+private fun isDidOfKeyType(did: DidInformation, keyType: DidKeyType): Boolean {
+    // FUTURE - this information will be contained in `DidInformation`
+    return when (keyType) {
+        DidKeyType.ED25519 -> {
+            // https://w3c-ccg.github.io/did-method-key/#ed25519-x25519
+            did.did.startsWith("did:key:z6Mk")
+        }
+        DidKeyType.P256 -> {
+            // https://w3c-ccg.github.io/did-method-key/#p-256
+            did.did.startsWith("did:key:zDn")
+        }
+    }
 }

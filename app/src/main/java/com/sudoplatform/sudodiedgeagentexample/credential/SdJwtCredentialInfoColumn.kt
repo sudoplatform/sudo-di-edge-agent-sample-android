@@ -17,21 +17,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
-import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
+import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
+import java.time.Instant
+import java.util.Date
 
 /**
- * Helper UI element for displaying the details of a w3c credential or credential exchange.
+ * Helper UI element for displaying the details of a SD-JWT credential or credential exchange.
  */
 @Composable
-fun W3cCredentialInfoColumn(
+fun SdJwtCredentialInfoColumn(
     modifier: Modifier = Modifier,
     id: String,
     fromSource: CredentialSource,
-    w3cCredential: W3cCredential,
-    proofType: JsonLdProofType? = null,
+    sdJwtVc: SdJwtVerifiableCredential,
 ) {
     Column(modifier) {
         Text(
@@ -58,33 +58,34 @@ fun W3cCredentialInfoColumn(
                     fromSource.issuerUrl,
                 )
             }
-            NameValueTextColumn("Format", "W3C")
-            NameValueTextColumn("Issuer", w3cCredential.issuer.id)
-            NameValueTextColumn("Issuance Date", w3cCredential.issuanceDate)
+            NameValueTextColumn("Format", "SD-JWT")
+            NameValueTextColumn("Issuer", sdJwtVc.issuer)
+            sdJwtVc.issuedAt?.let {
+                NameValueTextColumn(
+                    "Issuance Date",
+                    Date.from(Instant.ofEpochSecond(it.toLong())).toString(),
+                )
+            }
             NameValueTextColumn(
                 "Type",
-                w3cCredential.types.find { it != "VerifiableCredential" } ?: "",
+                sdJwtVc.verifiableCredentialType,
             )
-            proofType?.let {
-                NameValueTextColumn("Issuer Proof Type", it.toString())
-            }
         }
-        w3cCredential.credentialSubject.forEachIndexed { i, credSubject ->
-            HorizontalDivider()
+        HorizontalDivider()
 
-            Text(
-                text = "Credential Subject #$i",
-                Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold,
+        Text(
+            text = "Claims",
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 16.dp),
+            textAlign = TextAlign.Center,
+            fontWeight = FontWeight.Bold,
+        )
+        sdJwtVc.claims.entries.forEach {
+            NameValueTextRow(
+                name = it.key,
+                value = it.value.toString(),
             )
-            NameValueTextRow("Subject Id", credSubject.id ?: "N/A")
-
-            credSubject.properties.entries.sortedBy { it.key }.forEach { (k, v) ->
-                NameValueTextRow(name = k, value = v.toString())
-            }
         }
     }
 }

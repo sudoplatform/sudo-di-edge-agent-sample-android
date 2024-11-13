@@ -39,9 +39,10 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchange
-import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeInitiator
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeState
+import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.aries.AriesCredentialExchangeFormatData
+import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.RequiredAuthorization
 import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
@@ -128,9 +129,10 @@ fun CredentialExchangeScreen(
             override fun credentialExchangeStateChanged(credentialExchange: CredentialExchange) {
                 refreshCredentialExchangeList()
 
-                if (credentialExchange.state == CredentialExchangeState.ACKED) {
+                val state = credentialExchange.state
+                if (state == CredentialExchangeState.Aries.ACKED || state == CredentialExchangeState.OpenId4Vc.DONE) {
                     val msg =
-                        "Credential Exchange completed. A new credential can be found in the 'Credentials' screen: ${credentialExchange.credentialId}"
+                        "Credential Exchange completed. A new credential can be found in the 'Credentials' screen: ${credentialExchange.credentialIds}"
                     scope.launch {
                         showToast(msg, context)
                     }
@@ -248,25 +250,46 @@ private fun CredentialExchangeItemCardContent(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val (credName, credFormatName) = when (val data = item.formatData) {
-                is CredentialExchangeFormatData.Indy -> Pair(
-                    data.credentialMetadata.credentialDefinitionInfo?.name
-                        ?: data.credentialMetadata.credentialDefinitionId,
-                    "Anoncred",
-                )
+            val exchangeTypeName: String
+            val credName: String?
+            val credFormatName: String?
+            when (item) {
+                is CredentialExchange.Aries -> {
+                    exchangeTypeName = "Aries"
+                    when (val data = item.formatData) {
+                        is AriesCredentialExchangeFormatData.Indy -> {
+                            credName = data.credentialMetadata.credentialDefinitionInfo?.name
+                                ?: data.credentialMetadata.credentialDefinitionId
+                            credFormatName = "Anoncred"
+                        }
 
-                is CredentialExchangeFormatData.AriesLdProof -> Pair(
-                    data.currentProposedCredential.types.find { it != "VerifiableCredential" }
-                        ?: "VerifiableCredential",
-                    "W3C",
+                        is AriesCredentialExchangeFormatData.AriesLdProof -> {
+                            credName =
+                                data.currentProposedCredential.types.find { it != "VerifiableCredential" }
+                                    ?: "VerifiableCredential"
+                            credFormatName = "W3C"
+                        }
+                    }
+                }
+
+                is CredentialExchange.OpenId4Vc -> {
+                    exchangeTypeName = "OID4VC"
+                    credName = null
+                    credFormatName = null
+                }
+            }
+
+            Text(text = exchangeTypeName)
+            credName?.let {
+                Text(
+                    text = credName,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Text(
-                text = credName,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(text = credFormatName)
+            credFormatName?.let {
+                Text(text = credFormatName)
+            }
             Text(
                 text = item.state.toString().lowercase()
                     .replaceFirstChar { it.uppercase() },
@@ -285,13 +308,15 @@ private fun DefaultPreview() {
         CredentialExchangeScreenView(
             isListLoading = false,
             credentialExchangeList = listOf(
-                CredentialExchange(
+                CredentialExchange.Aries(
                     "credEx1",
-                    "",
+                    listOf(""),
+                    null,
+                    listOf(),
+                    CredentialExchangeState.Aries.ACKED,
                     "",
                     CredentialExchangeInitiator.EXTERNAL,
-                    CredentialExchangeState.ACKED,
-                    CredentialExchangeFormatData.Indy(
+                    AriesCredentialExchangeFormatData.Indy(
                         AnoncredV1CredentialMetadata(
                             "",
                             CredentialDefinitionInfo("Driver's License"),
@@ -300,16 +325,16 @@ private fun DefaultPreview() {
                         ),
                         listOf(),
                     ),
+                ),
+                CredentialExchange.Aries(
+                    "credEx2",
+                    listOf(""),
                     null,
                     listOf(),
-                ),
-                CredentialExchange(
-                    "credEx2",
-                    "",
+                    CredentialExchangeState.Aries.OFFER,
                     "",
                     CredentialExchangeInitiator.EXTERNAL,
-                    CredentialExchangeState.OFFER,
-                    formatData = CredentialExchangeFormatData.AriesLdProof(
+                    formatData = AriesCredentialExchangeFormatData.AriesLdProof(
                         currentProposedCredential =
                         W3cCredential(
                             contexts = emptyList(),
@@ -324,8 +349,18 @@ private fun DefaultPreview() {
                         ),
                         currentProposedProofType = JsonLdProofType.ED25519_SIGNATURE2018,
                     ),
+                ),
+                CredentialExchange.OpenId4Vc(
+                    "credEx3",
+                    listOf(""),
                     null,
                     listOf(),
+                    CredentialExchangeState.OpenId4Vc.AUTHORIZED,
+                    credentialIssuerUrl = "https://issuer.foo",
+                    credentialIssuerDisplay = null,
+                    offeredCredentialConfigurations = mapOf(),
+                    requiredAuthorization = RequiredAuthorization.PreAuthorized(null),
+                    issuedCredentialPreviews = listOf(),
                 ),
             ),
             {},

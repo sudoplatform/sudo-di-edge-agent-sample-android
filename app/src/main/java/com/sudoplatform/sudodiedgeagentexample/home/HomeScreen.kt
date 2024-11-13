@@ -6,6 +6,7 @@
 
 package com.sudoplatform.sudodiedgeagentexample.home
 
+import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,6 +48,7 @@ fun HomeScreen(
     agent: SudoDIEdgeAgent,
     sudoManager: SingleSudoManager,
     logger: Logger,
+    pendingDeepLinks: MutableList<Uri>,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -74,7 +76,25 @@ fun HomeScreen(
     }
 
     /**
+     * Iterate through the queue of [pendingDeepLinks], pop them and attempt to handle them
+     * as edge agent URLs (e.g. openid4vc offers etc)
+     */
+    fun handlePendingDeepLinks() = scope.launch {
+        var deepLink = pendingDeepLinks.removeFirstOrNull()
+        while (deepLink != null) {
+            // run catching for each and carry on if failure (e.g. if the request is old/stale);
+            // not a big deal, the user can re-request
+            runCatching {
+                agent.receiveUrl(deepLink.toString())
+            }.showToastOnFailure(context, logger, "Failed to handle deeplink")
+            // next
+            deepLink = pendingDeepLinks.removeFirstOrNull()
+        }
+    }
+
+    /**
      * When this composable initializes, listen for agent events and display toasts for each event.
+     * Also scan thru any pending deep links that have been received by this app, but not yet processed.
      *
      * When the composable disposes, unsubscribe from the agent events.
      */
@@ -107,6 +127,8 @@ fun HomeScreen(
                 }
             }
         })
+
+        handlePendingDeepLinks()
 
         onDispose {
             agent.unsubscribeToAgentEvents(subscriptionId)
