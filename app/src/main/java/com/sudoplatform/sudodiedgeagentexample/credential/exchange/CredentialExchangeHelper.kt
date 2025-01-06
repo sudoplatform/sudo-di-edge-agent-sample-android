@@ -30,33 +30,44 @@ fun List<CredentialExchange>.trySortByDateDescending(): List<CredentialExchange>
 }
 
 /**
- * Creates a DID:KEY of the specific [keyType] if one does not already exists.
- *
- * Returns the new or existing did:key DID
+ * Get an existing holder DID owned by the [SudoDIEdgeAgent] which meets the required
+ * [allowedMethods] & [allowedKeyTypes] criteria, or create a new one.
  */
-suspend fun idempotentCreateHolderDidKey(agent: SudoDIEdgeAgent, keyType: DidKeyType): String {
-    val dids = agent.dids.listAll(ListDidsOptions(ListDidsFilters(method = DidMethod.DID_KEY)))
+suspend fun idempotentCreateAppropriateHolderDid(
+    agent: SudoDIEdgeAgent,
+    allowedMethods: List<DidMethod>,
+    allowedKeyTypes: List<DidKeyType>,
+): String {
+    val dids = agent.dids.listAll(
+        ListDidsOptions(
+            ListDidsFilters(
+                allowedDidMethods = allowedMethods,
+                allowedKeyTypes = allowedKeyTypes,
+            ),
+        ),
+    )
 
-    val existingDid = dids.firstOrNull { did -> isDidOfKeyType(did, keyType) }
-
-    if (existingDid != null) {
-        return existingDid.did
+    // return if exists
+    dids.firstOrNull()?.let {
+        return it.did
     }
 
-    val newDid = agent.dids.createDid(CreateDidOptions.DidKey(keyType = keyType))
+    val newDid = createAppropriateHolderDid(agent, allowedMethods, allowedKeyTypes)
     return newDid.did
 }
 
-private fun isDidOfKeyType(did: DidInformation, keyType: DidKeyType): Boolean {
-    // FUTURE - this information will be contained in `DidInformation`
-    return when (keyType) {
-        DidKeyType.ED25519 -> {
-            // https://w3c-ccg.github.io/did-method-key/#ed25519-x25519
-            did.did.startsWith("did:key:z6Mk")
-        }
-        DidKeyType.P256 -> {
-            // https://w3c-ccg.github.io/did-method-key/#p-256
-            did.did.startsWith("did:key:zDn")
-        }
+private suspend fun createAppropriateHolderDid(
+    agent: SudoDIEdgeAgent,
+    allowedMethods: List<DidMethod>,
+    allowedKeyTypes: List<DidKeyType>,
+): DidInformation {
+    val method = allowedMethods.firstOrNull() ?: throw Exception("No suitable DID Method")
+    val keyType = allowedKeyTypes.firstOrNull() ?: throw Exception("No suitable Key type")
+
+    val options = when (method) {
+        DidMethod.DID_KEY -> CreateDidOptions.DidKey(keyType)
+        DidMethod.DID_JWK -> CreateDidOptions.DidJwk(keyType)
     }
+
+    return agent.dids.createDid(options)
 }

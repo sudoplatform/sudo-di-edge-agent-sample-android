@@ -44,15 +44,14 @@ import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExc
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.aries.AriesCredentialExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.RequiredAuthorization
 import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
 import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
-import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagent.subscriptions.AgentEventSubscriber
 import com.sudoplatform.sudodiedgeagentexample.Routes
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
+import com.sudoplatform.sudodiedgeagentexample.utils.PreviewDataHelper
 import com.sudoplatform.sudodiedgeagentexample.utils.SwipeToDeleteCard
 import com.sudoplatform.sudodiedgeagentexample.utils.showToast
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
@@ -71,7 +70,7 @@ fun CredentialExchangeScreen(
     val scope = rememberCoroutineScope()
 
     var isListLoading by remember { mutableStateOf(false) }
-    val credentialExchangeList = remember { mutableStateListOf<CredentialExchange>() }
+    val credentialExchangeList = remember { mutableStateListOf<UICredentialExchange>() }
 
     /**
      * Re-set the `credentialExchangeList` state to be the latest list of [CredentialExchange]s
@@ -81,7 +80,10 @@ fun CredentialExchangeScreen(
         scope.launch {
             isListLoading = true
             runCatching {
-                credentialExchangeList.swapList(agent.credentials.exchange.listAll())
+                val newList = agent.credentials.exchange.listAll().trySortByDateDescending().map {
+                    UICredentialExchange.fromCredentialExchange(agent, it)
+                }
+                credentialExchangeList.swapList(newList)
             }.showToastOnFailure(context, logger)
             isListLoading = false
         }
@@ -95,7 +97,7 @@ fun CredentialExchangeScreen(
         scope.launch {
             runCatching {
                 agent.credentials.exchange.deleteById(id)
-                credentialExchangeList.removeIf { it.credentialExchangeId == id }
+                credentialExchangeList.removeIf { it.exchange.credentialExchangeId == id }
             }.showToastOnFailure(context, logger)
         }
     }
@@ -116,8 +118,8 @@ fun CredentialExchangeScreen(
      * Whenever a credential exchange update occurs, refresh the whole list of displayed
      * [CredentialExchange]s.
      *
-     * If the credential update is for the [CredentialExchangeState.ACKED] state, then
-     * display a toast indicating that the credential has been stored.
+     * If the credential update is for a terminal state, then display a toast indicating that
+     * the credential has been stored.
      *
      * When the composable disposes, unsubscribe from the events.
      *
@@ -150,7 +152,7 @@ fun CredentialExchangeScreen(
         credentialExchangeList,
         refreshCredentialExchangeList = { refreshCredentialExchangeList() },
         deleteCredentialExchange = { deleteCredentialExchange(it) },
-        showInfo = { navigateToCredentialExchangeInfo(it) },
+        showInfo = { navigateToCredentialExchangeInfo(it.exchange) },
     )
 }
 
@@ -165,10 +167,10 @@ fun CredentialExchangeScreen(
 @Composable
 fun CredentialExchangeScreenView(
     isListLoading: Boolean,
-    credentialExchangeList: List<CredentialExchange>,
+    credentialExchangeList: List<UICredentialExchange>,
     refreshCredentialExchangeList: () -> Unit,
     deleteCredentialExchange: (id: String) -> Unit,
-    showInfo: (item: CredentialExchange) -> Unit,
+    showInfo: (item: UICredentialExchange) -> Unit,
 ) {
     Column(
         Modifier
@@ -201,13 +203,13 @@ fun CredentialExchangeScreenView(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 items(
-                    items = credentialExchangeList.trySortByDateDescending(),
-                    key = { it.credentialExchangeId },
+                    items = credentialExchangeList,
+                    key = { it.exchange.credentialExchangeId },
                     itemContent = { item ->
                         val currentItem = rememberUpdatedState(item)
                         Box(modifier = Modifier.padding(vertical = 4.dp)) {
                             SwipeToDeleteCard(onDelete = {
-                                deleteCredentialExchange(currentItem.value.credentialExchangeId)
+                                deleteCredentialExchange(currentItem.value.exchange.credentialExchangeId)
                             }) {
                                 CredentialExchangeItemCardContent(
                                     currentItem.value,
@@ -236,7 +238,7 @@ fun CredentialExchangeScreenView(
  */
 @Composable
 private fun CredentialExchangeItemCardContent(
-    item: CredentialExchange,
+    item: UICredentialExchange,
     showInfo: () -> Unit,
 ) {
     Row(
@@ -245,7 +247,7 @@ private fun CredentialExchangeItemCardContent(
     ) {
         Column(Modifier.weight(1.0f)) {
             Text(
-                text = item.credentialExchangeId,
+                text = item.exchange.credentialExchangeId,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -254,25 +256,13 @@ private fun CredentialExchangeItemCardContent(
             val credName: String?
             val credFormatName: String?
             when (item) {
-                is CredentialExchange.Aries -> {
+                is UICredentialExchange.Aries -> {
                     exchangeTypeName = "Aries"
-                    when (val data = item.formatData) {
-                        is AriesCredentialExchangeFormatData.Indy -> {
-                            credName = data.credentialMetadata.credentialDefinitionInfo?.name
-                                ?: data.credentialMetadata.credentialDefinitionId
-                            credFormatName = "Anoncred"
-                        }
-
-                        is AriesCredentialExchangeFormatData.AriesLdProof -> {
-                            credName =
-                                data.currentProposedCredential.types.find { it != "VerifiableCredential" }
-                                    ?: "VerifiableCredential"
-                            credFormatName = "W3C"
-                        }
-                    }
+                    credName = item.preview.previewName
+                    credFormatName = item.preview.previewFormat
                 }
 
-                is CredentialExchange.OpenId4Vc -> {
+                is UICredentialExchange.OpenId4Vc -> {
                     exchangeTypeName = "OID4VC"
                     credName = null
                     credFormatName = null
@@ -291,7 +281,7 @@ private fun CredentialExchangeItemCardContent(
                 Text(text = credFormatName)
             }
             Text(
-                text = item.state.toString().lowercase()
+                text = item.exchange.state.toString().lowercase()
                     .replaceFirstChar { it.uppercase() },
             )
         }
@@ -308,59 +298,67 @@ private fun DefaultPreview() {
         CredentialExchangeScreenView(
             isListLoading = false,
             credentialExchangeList = listOf(
-                CredentialExchange.Aries(
-                    "credEx1",
-                    listOf(""),
-                    null,
-                    listOf(),
-                    CredentialExchangeState.Aries.ACKED,
-                    "",
-                    CredentialExchangeInitiator.EXTERNAL,
-                    AriesCredentialExchangeFormatData.Indy(
-                        AnoncredV1CredentialMetadata(
-                            "",
-                            CredentialDefinitionInfo("Driver's License"),
-                            "",
-                            SchemaInfo("", ""),
-                        ),
+                UICredentialExchange.Aries(
+
+                    exchange = CredentialExchange.Aries(
+                        "credEx1",
+                        listOf(""),
+                        null,
                         listOf(),
-                    ),
-                ),
-                CredentialExchange.Aries(
-                    "credEx2",
-                    listOf(""),
-                    null,
-                    listOf(),
-                    CredentialExchangeState.Aries.OFFER,
-                    "",
-                    CredentialExchangeInitiator.EXTERNAL,
-                    formatData = AriesCredentialExchangeFormatData.AriesLdProof(
-                        currentProposedCredential =
-                        W3cCredential(
-                            contexts = emptyList(),
-                            id = null,
-                            types = listOf("Foobar"),
-                            credentialSubject = emptyList(),
-                            issuer = CredentialIssuer("", JsonObject(emptyMap())),
-                            issuanceDate = "",
-                            expirationDate = null,
-                            proof = null,
-                            properties = JsonObject(emptyMap()),
+                        CredentialExchangeState.Aries.ACKED,
+                        "",
+                        CredentialExchangeInitiator.EXTERNAL,
+                        AriesCredentialExchangeFormatData.Anoncred(
+                            AnoncredV1CredentialMetadata(
+                                "",
+                                "",
+                            ),
+                            listOf(),
                         ),
-                        currentProposedProofType = JsonLdProofType.ED25519_SIGNATURE2018,
                     ),
+                    preview = PreviewDataHelper.dummyUICredentialAnoncred(),
                 ),
-                CredentialExchange.OpenId4Vc(
-                    "credEx3",
-                    listOf(""),
-                    null,
-                    listOf(),
-                    CredentialExchangeState.OpenId4Vc.AUTHORIZED,
-                    credentialIssuerUrl = "https://issuer.foo",
-                    credentialIssuerDisplay = null,
-                    offeredCredentialConfigurations = mapOf(),
-                    requiredAuthorization = RequiredAuthorization.PreAuthorized(null),
-                    issuedCredentialPreviews = listOf(),
+                UICredentialExchange.Aries(
+                    exchange = CredentialExchange.Aries(
+                        "credEx2",
+                        listOf(""),
+                        null,
+                        listOf(),
+                        CredentialExchangeState.Aries.OFFER,
+                        "",
+                        CredentialExchangeInitiator.EXTERNAL,
+                        formatData = AriesCredentialExchangeFormatData.AriesLdProof(
+                            currentProposedCredential =
+                            W3cCredential(
+                                contexts = emptyList(),
+                                id = null,
+                                types = listOf("Foobar"),
+                                credentialSubject = emptyList(),
+                                issuer = CredentialIssuer("", JsonObject(emptyMap())),
+                                issuanceDate = "",
+                                expirationDate = null,
+                                proof = null,
+                                properties = JsonObject(emptyMap()),
+                            ),
+                            currentProposedProofType = JsonLdProofType.ED25519_SIGNATURE2018,
+                        ),
+                    ),
+                    preview = PreviewDataHelper.dummyUICredentialW3C(),
+                ),
+                UICredentialExchange.OpenId4Vc(
+                    exchange = CredentialExchange.OpenId4Vc(
+                        "credEx3",
+                        listOf(""),
+                        null,
+                        listOf(),
+                        CredentialExchangeState.OpenId4Vc.AUTHORIZED,
+                        credentialIssuerUrl = "https://issuer.foo",
+                        credentialIssuerDisplay = null,
+                        offeredCredentialConfigurations = mapOf(),
+                        requiredAuthorization = RequiredAuthorization.PreAuthorized(null),
+                        issuedCredentialPreviews = listOf(),
+                    ),
+                    issuedPreviews = emptyList(),
                 ),
             ),
             {},

@@ -48,36 +48,20 @@ import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.Ope
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.OpenId4VcCredentialConfiguration
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.RequiredAuthorization
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.TxCodeRequirement
-import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
 import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
-import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProof
 import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
-import com.sudoplatform.sudodiedgeagent.credentials.types.ProofPurpose
-import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
-import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagent.dids.types.DidKeyType
-import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
+import com.sudoplatform.sudodiedgeagent.dids.types.DidMethod
 import com.sudoplatform.sudodiedgeagentexample.credential.AnoncredCredentialInfoColumn
 import com.sudoplatform.sudodiedgeagentexample.credential.SdJwtCredentialInfoColumn
+import com.sudoplatform.sudodiedgeagentexample.credential.UICredential
 import com.sudoplatform.sudodiedgeagentexample.credential.W3cCredentialInfoColumn
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
+import com.sudoplatform.sudodiedgeagentexample.utils.PreviewDataHelper
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 
 @Composable
 fun CredentialExchangeInfoScreen(
@@ -89,7 +73,7 @@ fun CredentialExchangeInfoScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var credentialExchange: CredentialExchange? by remember { mutableStateOf(null) }
+    var credentialExchange: UICredentialExchange? by remember { mutableStateOf(null) }
     var isAcceptingCredential by remember { mutableStateOf(false) }
 
     /**
@@ -101,7 +85,11 @@ fun CredentialExchangeInfoScreen(
         scope.launch {
             isAcceptingCredential = true
             runCatching {
-                val holderDid = idempotentCreateHolderDidKey(agent, keyType = DidKeyType.ED25519)
+                val holderDid = idempotentCreateAppropriateHolderDid(
+                    agent,
+                    allowedMethods = listOf(DidMethod.DID_KEY),
+                    allowedKeyTypes = listOf(DidKeyType.ED25519),
+                )
 
                 agent.credentials.exchange.acceptOffer(
                     credentialExchangeId,
@@ -134,7 +122,8 @@ fun CredentialExchangeInfoScreen(
                     txCode,
                 ),
             )
-            credentialExchange = updatedCredentialExchange
+            credentialExchange =
+                UICredentialExchange.fromCredentialExchange(agent, updatedCredentialExchange)
         }.showToastOnFailure(context, logger, "Failed to authorize exchange")
         isAcceptingCredential = false
     }
@@ -148,15 +137,20 @@ fun CredentialExchangeInfoScreen(
     fun acceptOpenId4VcCredential(configurationId: String) = scope.launch {
         isAcceptingCredential = true
         runCatching {
-            val appropriateKeyType = when (val ex = credentialExchange) {
+            val allowedBindingMethods = when (val ex = credentialExchange?.exchange) {
                 is CredentialExchange.OpenId4Vc -> {
-                    val config = ex.offeredCredentialConfigurations[configurationId]
+                    ex.offeredCredentialConfigurations[configurationId]?.allowedBindingMethods
                         ?: throw Exception("Could not find openid4vc credential configuration")
-                    config.allowedBindingMethods.allowedKeyTypes.first()
                 }
+
                 else -> throw Exception("Exchange is not openid4vc based")
             }
-            val holderDid = idempotentCreateHolderDidKey(agent, keyType = appropriateKeyType)
+            val holderDid =
+                idempotentCreateAppropriateHolderDid(
+                    agent,
+                    allowedMethods = allowedBindingMethods.allowedDidMethods,
+                    allowedKeyTypes = allowedBindingMethods.allowedKeyTypes,
+                )
 
             val updatedCredentialExchange = agent.credentials.exchange.acceptOffer(
                 credentialExchangeId,
@@ -167,7 +161,8 @@ fun CredentialExchangeInfoScreen(
                 ),
             )
             // will update the displayed cred ex into the ISSUED state, with cred previews
-            credentialExchange = updatedCredentialExchange
+            credentialExchange =
+                UICredentialExchange.fromCredentialExchange(agent, updatedCredentialExchange)
         }.showToastOnFailure(context, logger, "Failed to authorize exchange")
         isAcceptingCredential = false
     }
@@ -195,7 +190,7 @@ fun CredentialExchangeInfoScreen(
         runCatching {
             val loadedCredEx = agent.credentials.exchange.getById(credentialExchangeId)
                 ?: throw Exception("Could not find credential exchange")
-            credentialExchange = loadedCredEx
+            credentialExchange = UICredentialExchange.fromCredentialExchange(agent, loadedCredEx)
         }.showToastOnFailure(context, logger, "Failed to load credential exchange")
     }
 
@@ -210,9 +205,9 @@ fun CredentialExchangeInfoScreen(
 }
 
 /**
- * UI for the "Credential Exchange Info Screen". Shows the details of a given [CredentialExchange].
+ * UI for the "Credential Exchange Info Screen". Shows the details of a given [UICredentialExchange].
  *
- * UI will display a loading spinner until [credentialExchange] becomes non-null.
+ * UI will display a loading spinner until [UICredentialExchange] becomes non-null.
  *
  * UI details depend on type of [CredentialExchange] -
  * [CredentialExchange.Aries] or [CredentialExchange.OpenId4Vc].
@@ -220,7 +215,7 @@ fun CredentialExchangeInfoScreen(
  */
 @Composable
 fun CredentialExchangeInfoScreenView(
-    credentialExchange: CredentialExchange?,
+    credentialExchange: UICredentialExchange?,
     acceptAriesCredential: () -> Unit,
     authorizeExchange: (String?) -> Unit,
     acceptOpenId4VcCredential: (String) -> Unit,
@@ -245,12 +240,12 @@ fun CredentialExchangeInfoScreenView(
             }
         } else {
             when (credentialExchange) {
-                is CredentialExchange.Aries -> CredentialExchangeInfoScreenViewAriesContent(
+                is UICredentialExchange.Aries -> CredentialExchangeInfoScreenViewAriesContent(
                     credentialExchange = credentialExchange,
                     acceptCredential = acceptAriesCredential,
                 )
 
-                is CredentialExchange.OpenId4Vc -> CredentialExchangeInfoScreenViewOpenId4VcContent(
+                is UICredentialExchange.OpenId4Vc -> CredentialExchangeInfoScreenViewOpenId4VcContent(
                     credentialExchange = credentialExchange,
                     authorizeExchange = authorizeExchange,
                     acceptCredential = acceptOpenId4VcCredential,
@@ -263,7 +258,7 @@ fun CredentialExchangeInfoScreenView(
 
 /**
  * Aries content for the "Credential Exchange Info Screen".
- * Shows the details of a given aries-based [CredentialExchange].
+ * Shows the details of a given aries-based [UICredentialExchange].
  *
  * When the [CredentialExchange] is in the [CredentialExchangeState.Aries.OFFER] state, then display
  * an "Accept" button, which upon clicking will inform the issuer that the agent would like to accept
@@ -271,28 +266,23 @@ fun CredentialExchangeInfoScreenView(
  */
 @Composable
 private fun ColumnScope.CredentialExchangeInfoScreenViewAriesContent(
-    credentialExchange: CredentialExchange.Aries,
+    credentialExchange: UICredentialExchange.Aries,
     acceptCredential: () -> Unit,
 ) {
-    when (val formatData = credentialExchange.formatData) {
-        is AriesCredentialExchangeFormatData.Indy -> AnoncredCredentialInfoColumn(
+    when (val preview = credentialExchange.preview) {
+        is UICredential.Anoncred -> AnoncredCredentialInfoColumn(
             Modifier.weight(1.0f),
-            id = credentialExchange.credentialExchangeId,
-            fromSource = CredentialSource.DidCommConnection(credentialExchange.connectionId),
-            metadata = formatData.credentialMetadata,
-            attributes = formatData.credentialAttributes,
+            credential = preview,
         )
 
-        is AriesCredentialExchangeFormatData.AriesLdProof -> W3cCredentialInfoColumn(
+        is UICredential.W3C -> W3cCredentialInfoColumn(Modifier.weight(1.0f), credential = preview)
+        is UICredential.SdJwtVc -> SdJwtCredentialInfoColumn(
             Modifier.weight(1.0f),
-            id = credentialExchange.credentialExchangeId,
-            fromSource = CredentialSource.DidCommConnection(credentialExchange.connectionId),
-            w3cCredential = formatData.currentProposedCredential,
-            proofType = formatData.currentProposedProofType,
+            credential = preview,
         )
     }
 
-    if (credentialExchange.state == CredentialExchangeState.Aries.OFFER) {
+    if (credentialExchange.exchange.state == CredentialExchangeState.Aries.OFFER) {
         Button(
             onClick = { acceptCredential() },
             Modifier.fillMaxWidth(),
@@ -320,38 +310,30 @@ private fun ColumnScope.CredentialExchangeInfoScreenViewAriesContent(
  */
 @Composable
 private fun ColumnScope.CredentialExchangeInfoScreenViewOpenId4VcContent(
-    credentialExchange: CredentialExchange.OpenId4Vc,
+    credentialExchange: UICredentialExchange.OpenId4Vc,
     authorizeExchange: (String?) -> Unit,
     acceptCredential: (String) -> Unit,
     storeCredential: () -> Unit,
 ) {
     var inputTxCode by remember { mutableStateOf("") }
 
-    when (val issuedCredential = credentialExchange.issuedCredentialPreviews.firstOrNull()) {
+    when (val issuedCredential = credentialExchange.issuedPreviews.firstOrNull()) {
         // is in final state, just needs storage
-        is CredentialFormatData -> {
+        is UICredential -> {
             when (issuedCredential) {
-                is CredentialFormatData.AnoncredV1 -> AnoncredCredentialInfoColumn(
+                is UICredential.Anoncred -> AnoncredCredentialInfoColumn(
                     Modifier.weight(1.0f),
-                    id = credentialExchange.credentialExchangeId,
-                    fromSource = CredentialSource.OpenId4VcIssuer(credentialExchange.credentialIssuerUrl),
-                    metadata = issuedCredential.credentialMetadata,
-                    attributes = issuedCredential.credentialAttributes,
+                    credential = issuedCredential,
                 )
 
-                is CredentialFormatData.W3C -> W3cCredentialInfoColumn(
+                is UICredential.W3C -> W3cCredentialInfoColumn(
                     Modifier.weight(1.0f),
-                    id = credentialExchange.credentialExchangeId,
-                    fromSource = CredentialSource.OpenId4VcIssuer(credentialExchange.credentialIssuerUrl),
-                    w3cCredential = issuedCredential.credential,
-                    proofType = null,
+                    credential = issuedCredential,
                 )
 
-                is CredentialFormatData.SdJwtVc -> SdJwtCredentialInfoColumn(
+                is UICredential.SdJwtVc -> SdJwtCredentialInfoColumn(
                     Modifier.weight(1.0f),
-                    id = credentialExchange.credentialExchangeId,
-                    fromSource = CredentialSource.OpenId4VcIssuer(credentialExchange.credentialIssuerUrl),
-                    sdJwtVc = issuedCredential.credential,
+                    credential = issuedCredential,
                 )
             }
 
@@ -375,20 +357,20 @@ private fun ColumnScope.CredentialExchangeInfoScreenViewOpenId4VcContent(
                 }
 
                 items(
-                    items = credentialExchange.offeredCredentialConfigurations.entries.toList(),
+                    items = credentialExchange.exchange.offeredCredentialConfigurations.entries.toList(),
                     key = { it.key },
                     itemContent = { item ->
                         val currentItem = rememberUpdatedState(item)
                         Text(text = "${currentItem.value.key}:", fontWeight = FontWeight.Bold)
                         OpenId4VcCredentialConfigurationView(
-                            issuerDisplay = credentialExchange.credentialIssuerDisplay
+                            issuerDisplay = credentialExchange.exchange.credentialIssuerDisplay
                                 ?: emptyList(),
                             configuration = currentItem.value.value,
                         )
                         Button(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { acceptCredential(currentItem.value.key) },
-                            enabled = credentialExchange.state == CredentialExchangeState.OpenId4Vc.AUTHORIZED,
+                            enabled = credentialExchange.exchange.state == CredentialExchangeState.OpenId4Vc.AUTHORIZED,
                         ) {
                             Text(text = "Accept")
                         }
@@ -399,9 +381,9 @@ private fun ColumnScope.CredentialExchangeInfoScreenViewOpenId4VcContent(
             HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             // unauthorized -> authorized flow
-            if (credentialExchange.state == CredentialExchangeState.OpenId4Vc.UNAUTHORIZED) {
+            if (credentialExchange.exchange.state == CredentialExchangeState.OpenId4Vc.UNAUTHORIZED) {
                 val preAuth =
-                    (credentialExchange.requiredAuthorization as RequiredAuthorization.PreAuthorized)
+                    (credentialExchange.exchange.requiredAuthorization as RequiredAuthorization.PreAuthorized)
                 preAuth.txCodeRequired?.let {
                     TextField(
                         modifier = Modifier.fillMaxWidth(),
@@ -428,26 +410,21 @@ private fun ColumnScope.CredentialExchangeInfoScreenViewOpenId4VcContent(
 private fun DefaultPreview() {
     SudoDIEdgeAgentExampleTheme {
         CredentialExchangeInfoScreenView(
-            credentialExchange = CredentialExchange.Aries(
-                "credEx1",
-                null,
-                null,
-                listOf(),
-                CredentialExchangeState.Aries.OFFER,
-                "conn1",
-                CredentialExchangeInitiator.EXTERNAL,
-                AriesCredentialExchangeFormatData.Indy(
-                    AnoncredV1CredentialMetadata(
-                        "credDef1",
-                        CredentialDefinitionInfo("My Cred Def 1"),
-                        "schema1",
-                        SchemaInfo("My Schema 1", "1.0"),
-                    ),
-                    listOf(
-                        AnoncredV1CredentialAttribute("Attribute 1", "Value 1", null),
-                        AnoncredV1CredentialAttribute("Attribute 2", "Value 2", null),
+            credentialExchange = UICredentialExchange.Aries(
+                exchange = CredentialExchange.Aries(
+                    "credEx1",
+                    null,
+                    null,
+                    listOf(),
+                    CredentialExchangeState.Aries.OFFER,
+                    "conn1",
+                    CredentialExchangeInitiator.EXTERNAL,
+                    AriesCredentialExchangeFormatData.Anoncred(
+                        AnoncredV1CredentialMetadata("", ""),
+                        emptyList(),
                     ),
                 ),
+                preview = PreviewDataHelper.dummyUICredentialAnoncred(),
             ),
             {},
             {},
@@ -463,53 +440,21 @@ private fun DefaultPreview() {
 private fun DefaultPreview2() {
     SudoDIEdgeAgentExampleTheme {
         CredentialExchangeInfoScreenView(
-            credentialExchange = CredentialExchange.Aries(
-                "credEx1",
-                null,
-                null,
-                listOf(),
-                CredentialExchangeState.Aries.OFFER,
-                "conn1",
-                CredentialExchangeInitiator.EXTERNAL,
-                AriesCredentialExchangeFormatData.AriesLdProof(
-                    currentProposedProofType = JsonLdProofType.ED25519_SIGNATURE2018,
-                    currentProposedCredential = W3cCredential(
-                        contexts = emptyList(),
-                        id = null,
-                        types = listOf("Foobar"),
-                        credentialSubject = listOf(
-                            CredentialSubject(
-                                "did:foo:holder1",
-                                properties = buildJsonObject {
-                                    put("attribute 1", "value 1")
-                                    put("attribute 2", 2)
-                                    putJsonObject("attribute 3") {
-                                        put("attribute 3.1", 3.1)
-                                        putJsonArray("attributes 3.2") {
-                                            add(3.2)
-                                            add("3.2")
-                                        }
-                                    }
-                                },
-                            ),
-                        ),
-                        issuer = CredentialIssuer("did:foo:issuer1", JsonObject(emptyMap())),
-                        issuanceDate = "2018-04-01T15:20:15Z",
-                        expirationDate = null,
-                        proof = listOf(
-                            JsonLdProof(
-                                JsonLdProofType.BBS_BLS_SIGNATURE2020,
-                                "",
-                                "",
-                                ProofPurpose.ASSERTION_METHOD,
-                                JsonObject(
-                                    emptyMap(),
-                                ),
-                            ),
-                        ),
-                        properties = JsonObject(emptyMap()),
+            credentialExchange = UICredentialExchange.Aries(
+                exchange = CredentialExchange.Aries(
+                    "credEx1",
+                    null,
+                    null,
+                    listOf(),
+                    CredentialExchangeState.Aries.OFFER,
+                    "conn1",
+                    CredentialExchangeInitiator.EXTERNAL,
+                    AriesCredentialExchangeFormatData.AriesLdProof(
+                        currentProposedProofType = JsonLdProofType.ED25519_SIGNATURE2018,
+                        currentProposedCredential = PreviewDataHelper.dummyW3CCredential(),
                     ),
                 ),
+                preview = PreviewDataHelper.dummyUICredentialW3C(),
             ),
             {},
             {},
@@ -525,32 +470,35 @@ private fun DefaultPreview2() {
 private fun DefaultPreview3() {
     SudoDIEdgeAgentExampleTheme {
         CredentialExchangeInfoScreenView(
-            credentialExchange = CredentialExchange.OpenId4Vc(
-                "credEx1",
-                null,
-                null,
-                listOf(),
-                CredentialExchangeState.OpenId4Vc.UNAUTHORIZED,
-                credentialIssuerUrl = "https://issuer.foo",
-                credentialIssuerDisplay = null,
-                requiredAuthorization = RequiredAuthorization.PreAuthorized(
-                    TxCodeRequirement(
-                        null,
-                        null,
-                    ),
-                ),
-                offeredCredentialConfigurations = mapOf(
-                    "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
-                        display = null,
-                        vct = "UniversityDegree",
-                        claims = mapOf(),
-                        allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
-                            emptyList(),
-                            emptyList(),
+            credentialExchange = UICredentialExchange.OpenId4Vc(
+                exchange = CredentialExchange.OpenId4Vc(
+                    "credEx1",
+                    null,
+                    null,
+                    listOf(),
+                    CredentialExchangeState.OpenId4Vc.UNAUTHORIZED,
+                    credentialIssuerUrl = "https://issuer.foo",
+                    credentialIssuerDisplay = null,
+                    requiredAuthorization = RequiredAuthorization.PreAuthorized(
+                        TxCodeRequirement(
+                            null,
+                            null,
                         ),
                     ),
+                    offeredCredentialConfigurations = mapOf(
+                        "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
+                            display = null,
+                            vct = "UniversityDegree",
+                            claims = mapOf(),
+                            allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
+                                emptyList(),
+                                emptyList(),
+                            ),
+                        ),
+                    ),
+                    issuedCredentialPreviews = listOf(),
                 ),
-                issuedCredentialPreviews = listOf(),
+                issuedPreviews = emptyList(),
             ),
             {},
             {},
@@ -566,48 +514,35 @@ private fun DefaultPreview3() {
 private fun DefaultPreview4() {
     SudoDIEdgeAgentExampleTheme {
         CredentialExchangeInfoScreenView(
-            credentialExchange = CredentialExchange.OpenId4Vc(
-                "credEx1",
-                null,
-                null,
-                listOf(),
-                CredentialExchangeState.OpenId4Vc.ISSUED,
-                credentialIssuerUrl = "https://issuer.foo",
-                credentialIssuerDisplay = null,
-                requiredAuthorization = RequiredAuthorization.PreAuthorized(
-                    TxCodeRequirement(
-                        null,
-                        null,
-                    ),
-                ),
-                offeredCredentialConfigurations = mapOf(
-                    "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
-                        display = null,
-                        vct = "UniversityDegree",
-                        claims = mapOf(),
-                        allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
-                            emptyList(),
-                            emptyList(),
+            credentialExchange = UICredentialExchange.OpenId4Vc(
+                exchange = CredentialExchange.OpenId4Vc(
+                    "credEx1",
+                    null,
+                    null,
+                    listOf(),
+                    CredentialExchangeState.OpenId4Vc.ISSUED,
+                    credentialIssuerUrl = "https://issuer.foo",
+                    credentialIssuerDisplay = null,
+                    requiredAuthorization = RequiredAuthorization.PreAuthorized(
+                        TxCodeRequirement(
+                            null,
+                            null,
                         ),
                     ),
-                ),
-                issuedCredentialPreviews = listOf(
-                    CredentialFormatData.SdJwtVc(
-                        SdJwtVerifiableCredential(
-                            compactSdJwt = "j.w.t~",
-                            verifiableCredentialType = "UniversityDegree",
-                            issuer = "did:foo:bar",
-                            validAfter = null,
-                            validBefore = null,
-                            issuedAt = 1727244595u,
-                            keyBinding = null,
-                            claims = mapOf(
-                                "code" to SdJsonElement.Primitive(true, JsonPrimitive("Math")),
-                                "gpa" to SdJsonElement.Primitive(true, JsonPrimitive(4)),
+                    offeredCredentialConfigurations = mapOf(
+                        "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
+                            display = null,
+                            vct = "UniversityDegree",
+                            claims = mapOf(),
+                            allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
+                                emptyList(),
+                                emptyList(),
                             ),
                         ),
                     ),
+                    issuedCredentialPreviews = listOf(),
                 ),
+                issuedPreviews = listOf(PreviewDataHelper.dummyUICredentialSdJwt()),
             ),
             {},
             {},

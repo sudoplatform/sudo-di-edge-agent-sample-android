@@ -104,7 +104,7 @@ fun ProofExchange.getPresentationDefinitionV2(): PresentationDefinitionV2? {
     return when (this) {
         is ProofExchange.Aries -> when (val data = formatData) {
             is AriesProofExchangeFormatData.Dif -> data.requestedPresentationDefinition.toV2()
-            is AriesProofExchangeFormatData.Indy -> null
+            is AriesProofExchangeFormatData.Anoncred -> null
         }
 
         is ProofExchange.OpenId4Vc -> presentationRequest

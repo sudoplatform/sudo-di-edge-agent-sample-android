@@ -17,7 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 import java.time.Instant
@@ -29,9 +28,7 @@ import java.util.Date
 @Composable
 fun SdJwtCredentialInfoColumn(
     modifier: Modifier = Modifier,
-    id: String,
-    fromSource: CredentialSource,
-    sdJwtVc: SdJwtVerifiableCredential,
+    credential: UICredential.SdJwtVc,
 ) {
     Column(modifier) {
         Text(
@@ -46,21 +43,21 @@ fun SdJwtCredentialInfoColumn(
                 .fillMaxWidth()
                 .padding(vertical = 16.dp),
         ) {
-            NameValueTextColumn("ID", id)
-            when (fromSource) {
+            NameValueTextColumn("ID", credential.id)
+            when (val source = credential.source) {
                 is CredentialSource.DidCommConnection -> NameValueTextColumn(
                     "From Connection",
-                    fromSource.connectionId,
+                    source.connectionId,
                 )
 
                 is CredentialSource.OpenId4VcIssuer -> NameValueTextColumn(
                     "From OID Issuer",
-                    fromSource.issuerUrl,
+                    source.issuerUrl,
                 )
             }
             NameValueTextColumn("Format", "SD-JWT")
-            NameValueTextColumn("Issuer", sdJwtVc.issuer)
-            sdJwtVc.issuedAt?.let {
+            NameValueTextColumn("Issuer", credential.sdJwtVc.issuer)
+            credential.sdJwtVc.issuedAt?.let {
                 NameValueTextColumn(
                     "Issuance Date",
                     Date.from(Instant.ofEpochSecond(it.toLong())).toString(),
@@ -68,7 +65,7 @@ fun SdJwtCredentialInfoColumn(
             }
             NameValueTextColumn(
                 "Type",
-                sdJwtVc.verifiableCredentialType,
+                credential.sdJwtVc.verifiableCredentialType,
             )
         }
         HorizontalDivider()
@@ -81,7 +78,7 @@ fun SdJwtCredentialInfoColumn(
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Bold,
         )
-        sdJwtVc.claims.entries.forEach {
+        credential.sdJwtVc.claims.entries.forEach {
             NameValueTextRow(
                 name = it.key,
                 value = it.value.toString(),

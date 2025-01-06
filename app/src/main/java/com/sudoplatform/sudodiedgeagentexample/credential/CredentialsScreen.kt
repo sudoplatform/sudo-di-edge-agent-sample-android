@@ -37,23 +37,17 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
-import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagentexample.Routes
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
+import com.sudoplatform.sudodiedgeagentexample.utils.PreviewDataHelper
 import com.sudoplatform.sudodiedgeagentexample.utils.SwipeToDeleteCard
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudodiedgeagentexample.utils.swapList
 import com.sudoplatform.sudologging.Logger
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
 
 @Composable
 fun CredentialsScreen(
@@ -65,7 +59,7 @@ fun CredentialsScreen(
     val scope = rememberCoroutineScope()
 
     var isListLoading by remember { mutableStateOf(false) }
-    val credentialList = remember { mutableStateListOf<Credential>() }
+    val credentialList = remember { mutableStateListOf<UICredential>() }
 
     /**
      * Re-set the `credentialList` state to be the latest list of [Credential]s
@@ -75,7 +69,10 @@ fun CredentialsScreen(
         scope.launch {
             isListLoading = true
             runCatching {
-                credentialList.swapList(agent.credentials.listAll())
+                val newList = agent.credentials.listAll().trySortByDateDescending().map {
+                    UICredential.fromCredential(agent, it)
+                }
+                credentialList.swapList(newList)
             }.showToastOnFailure(context, logger)
             isListLoading = false
         }
@@ -89,13 +86,13 @@ fun CredentialsScreen(
         scope.launch {
             runCatching {
                 agent.credentials.deleteById(id)
-                credentialList.removeIf { it.credentialId == id }
+                credentialList.removeIf { it.id == id }
             }.showToastOnFailure(context, logger)
         }
     }
 
-    fun navigateToCredentialInfo(item: Credential) {
-        navController.navigate("${Routes.CREDENTIAL_INFO}/${item.credentialId}")
+    fun navigateToCredentialInfo(item: UICredential) {
+        navController.navigate("${Routes.CREDENTIAL_INFO}/${item.id}")
     }
 
     /**
@@ -120,10 +117,10 @@ fun CredentialsScreen(
 @Composable
 fun CredentialsScreenView(
     isListLoading: Boolean,
-    credentialList: List<Credential>,
+    credentialList: List<UICredential>,
     refreshCredentialList: () -> Unit,
     deleteCredential: (id: String) -> Unit,
-    showInfo: (item: Credential) -> Unit,
+    showInfo: (item: UICredential) -> Unit,
 ) {
     Column(
         Modifier
@@ -156,13 +153,13 @@ fun CredentialsScreenView(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 items(
-                    items = credentialList.trySortByDateDescending(),
-                    key = { it.credentialId },
+                    items = credentialList,
+                    key = { it.id },
                     itemContent = { item ->
                         val currentItem = rememberUpdatedState(item)
                         Box(modifier = Modifier.padding(vertical = 4.dp)) {
                             SwipeToDeleteCard(onDelete = {
-                                deleteCredential(currentItem.value.credentialId)
+                                deleteCredential(currentItem.value.id)
                             }) {
                                 CredentialItemCardContent(currentItem.value, showInfo = {
                                     showInfo(currentItem.value)
@@ -184,7 +181,7 @@ fun CredentialsScreenView(
  */
 @Composable
 private fun CredentialItemCardContent(
-    item: Credential,
+    item: UICredential,
     showInfo: () -> Unit,
 ) {
     Row(
@@ -193,35 +190,17 @@ private fun CredentialItemCardContent(
     ) {
         Column(Modifier.weight(1.0f)) {
             Text(
-                text = item.credentialId,
+                text = item.id,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            val (credName, credFormatName) = when (val data = item.formatData) {
-                is CredentialFormatData.AnoncredV1 -> Pair(
-                    data.credentialMetadata.credentialDefinitionInfo?.name
-                        ?: data.credentialMetadata.credentialDefinitionId,
-                    "Anoncred",
-                )
-
-                is CredentialFormatData.W3C -> Pair(
-                    data.credential.types.find { it != "VerifiableCredential" }
-                        ?: "VerifiableCredential",
-                    "W3C",
-                )
-
-                is CredentialFormatData.SdJwtVc -> Pair(
-                    data.credential.verifiableCredentialType,
-                    "SD-JWT VC",
-                )
-            }
             Text(
-                text = credName,
+                text = item.previewName,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(text = credFormatName)
+            Text(text = item.previewFormat)
         }
         Button(onClick = { showInfo() }) {
             Text(text = "Info")
@@ -236,39 +215,10 @@ private fun DefaultPreview() {
         CredentialsScreenView(
             isListLoading = false,
             listOf(
-                Credential(
-                    "1",
-                    "conn1",
-                    CredentialSource.DidCommConnection("John"),
-                    CredentialFormatData.AnoncredV1(
-                        AnoncredV1CredentialMetadata(
-                            "",
-                            CredentialDefinitionInfo("Driver's License"),
-                            "",
-                            SchemaInfo("", ""),
-                        ),
-                        listOf(),
-                    ),
-                    listOf(),
-                ),
-                Credential(
-                    "2",
-                    "conn1",
-                    CredentialSource.OpenId4VcIssuer("https://issuer.john"),
-                    CredentialFormatData.W3C(
-                        W3cCredential(
-                            contexts = emptyList(),
-                            id = null,
-                            types = listOf("Foobar"),
-                            credentialSubject = emptyList(),
-                            issuer = CredentialIssuer("", JsonObject(emptyMap())),
-                            issuanceDate = "",
-                            expirationDate = null,
-                            proof = null,
-                            properties = JsonObject(emptyMap()),
-                        ),
-                    ),
-                    listOf(),
+                PreviewDataHelper.dummyUICredentialAnoncred().copy(id = "1"),
+                PreviewDataHelper.dummyUICredentialW3C().copy(
+                    id = "2",
+                    source = CredentialSource.OpenId4VcIssuer("https://issuer.john"),
                 ),
             ),
             {},

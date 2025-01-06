@@ -11,6 +11,7 @@ import android.content.Context
 import android.net.Uri
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.configuration.AgentConfiguration
+import com.sudoplatform.sudodiedgeagent.configuration.NetworkConfiguration
 import com.sudoplatform.sudodiedgeagent.configuration.PeerConnectionConfiguration
 import com.sudoplatform.sudologging.AndroidUtilsLogDriver
 import com.sudoplatform.sudologging.LogLevel
@@ -39,7 +40,18 @@ class App : Application() {
     var pendingDeepLinks: MutableList<Uri> = mutableListOf()
 
     companion object {
-        private const val LEDGER_GENESIS_FILE_NAME = "ledger_genesis.json"
+        /**
+         * Name of the sov/indy ledger genesis file. Contains the genesis transactions
+         * that will be used by the agent when resolving did:sov and/or unqualified indy
+         * ledger resources.
+         */
+        private const val SOV_LEDGER_GENESIS_FILE_NAME = "ledger_genesis.json"
+
+        /**
+         * A unique namespace to map with the chosen sov/indy ledger. If the genesis file changes,
+         * the namespace should be updated. Used for distinguish cache across ledgers.
+         */
+        private const val SOV_LEDGER_NAMESPACE = "indicio:testnet"
     }
 
     override fun onCreate() {
@@ -55,17 +67,31 @@ class App : Application() {
      */
     private fun initializeAgent() {
         /**
-         * Use the default genesis file from within the assets of this app.
+         * Use the default sov genesis file from within the assets of this app.
          *
          * Note that this is done for quick demonstration purposes, copying a file from assets
          * on every app launch is not efficient. Production applications may wish manage their files
          * more efficiently.
          */
-        val genesisFile = persistFileFromAssets(this, LEDGER_GENESIS_FILE_NAME)
+        val sovGenesisFile = persistFileFromAssets(this, SOV_LEDGER_GENESIS_FILE_NAME)
 
-        /** Configure the agent to use this genesis file as it's "Ledger" and give the agent a public-facing label */
+        /**
+         * Configure the agent to use the given genesis file for it's sov/indy ledger, and enable
+         * cheqd ledger usage via the default configuration.
+         */
+        val networkConfiguration = NetworkConfiguration(
+            sovConfiguration = NetworkConfiguration.Sov(
+                genesisFiles = listOf(sovGenesisFile),
+                namespace = SOV_LEDGER_NAMESPACE,
+            ),
+            cheqdConfiguration = NetworkConfiguration.Cheqd(),
+        )
+
+        /**
+         * Configure the agent to use networking configuration and give the agent a public-facing label
+         */
         val agentConfiguration = AgentConfiguration(
-            genesisFiles = listOf(genesisFile),
+            networkConfiguration = networkConfiguration,
             peerConnectionConfiguration = PeerConnectionConfiguration("Sudo Agent Android"),
         )
 

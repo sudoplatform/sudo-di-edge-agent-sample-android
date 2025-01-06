@@ -16,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
-import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
@@ -28,10 +26,7 @@ import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 @Composable
 fun AnoncredCredentialInfoColumn(
     modifier: Modifier = Modifier,
-    id: String,
-    fromSource: CredentialSource,
-    metadata: AnoncredV1CredentialMetadata,
-    attributes: List<AnoncredV1CredentialAttribute>,
+    credential: UICredential.Anoncred,
 ) {
     Column(modifier) {
         Text(
@@ -46,18 +41,26 @@ fun AnoncredCredentialInfoColumn(
                 .fillMaxWidth()
                 .padding(vertical = 16.dp),
         ) {
-            NameValueTextColumn("ID", id)
-            when (fromSource) {
-                is CredentialSource.DidCommConnection -> NameValueTextColumn("From Connection", fromSource.connectionId)
-                is CredentialSource.OpenId4VcIssuer -> NameValueTextColumn("From OID Issuer", fromSource.issuerUrl)
+            NameValueTextColumn("ID", credential.id)
+            when (val source = credential.source) {
+                is CredentialSource.DidCommConnection -> NameValueTextColumn(
+                    "From Connection",
+                    source.connectionId,
+                )
+
+                is CredentialSource.OpenId4VcIssuer -> NameValueTextColumn(
+                    "From OID Issuer",
+                    source.issuerUrl,
+                )
             }
             NameValueTextColumn("Format", "Anoncreds")
-            NameValueTextColumn("Cred Def ID", metadata.credentialDefinitionId)
+            NameValueTextColumn("Cred Def ID", credential.metadata.credentialDefinition.id)
             NameValueTextColumn(
-                "Cred Def Name",
-                metadata.credentialDefinitionInfo?.name ?: "Unknown",
+                "Cred Def Issuer",
+                credential.metadata.credentialDefinition.issuerId,
             )
-            NameValueTextColumn("Schema ID", metadata.schemaId)
+            NameValueTextColumn("Schema ID", credential.metadata.schema.id)
+            NameValueTextColumn("Schema Name", credential.metadata.schema.name)
         }
         HorizontalDivider()
 
@@ -69,7 +72,7 @@ fun AnoncredCredentialInfoColumn(
             textAlign = TextAlign.Center,
             fontWeight = FontWeight.Bold,
         )
-        attributes.sortAlphabetically().forEach {
+        credential.credentialAttributes.sortAlphabetically().forEach {
             NameValueTextRow(
                 name = it.name,
                 value = it.value,

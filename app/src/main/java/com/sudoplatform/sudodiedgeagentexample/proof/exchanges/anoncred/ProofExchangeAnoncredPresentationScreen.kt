@@ -67,7 +67,7 @@ import kotlinx.coroutines.launch
  */
 private data class AnoncredPresentationDetails(
     val proofExchange: ProofExchange,
-    val retrievedCredentials: RetrievedPresentationCredentials.Indy,
+    val retrievedCredentials: RetrievedPresentationCredentials.Anoncred,
     val credentialIdToAttributes: Map<String, List<AnoncredV1CredentialAttribute>>,
 )
 
@@ -108,7 +108,7 @@ fun ProofExchangeAnoncredPresentationScreen(
      * map the credential's ID to the list of [AnoncredV1CredentialAttribute] that belong to it.
      */
     suspend fun loadAttributesOfAllRetrievedCredentials(
-        retrievedCredentials: RetrievedPresentationCredentials.Indy,
+        retrievedCredentials: RetrievedPresentationCredentials.Anoncred,
     ): Map<String, List<AnoncredV1CredentialAttribute>> {
         val allSuitableCredentialIds =
             retrievedCredentials.credentialsForRequestedAttributes.flatMap { it.value } +
@@ -139,7 +139,7 @@ fun ProofExchangeAnoncredPresentationScreen(
             val proofEx = agent.proofs.exchange.getById(proofExchangeId)
                 ?: throw Exception("Could not find proof exchange")
             val retrievedCredentials =
-                agent.proofs.exchange.retrieveCredentialsForProofRequest(proofExchangeId) as RetrievedPresentationCredentials.Indy
+                agent.proofs.exchange.retrieveCredentialsForProofRequest(proofExchangeId) as RetrievedPresentationCredentials.Anoncred
 
             val credentialIdToAttributes =
                 loadAttributesOfAllRetrievedCredentials(retrievedCredentials)
@@ -237,7 +237,7 @@ private fun ProofExchangePresentationScreenView(
      * Constructing a [PresentationCredentials] from the maps this composable has constructed.
      */
     fun presentSelectedCredentials() {
-        val presentationCredentials = PresentationCredentials.Indy(
+        val presentationCredentials = PresentationCredentials.Anoncred(
             credentialsForRequestedAttributes = presentationAttributes,
             credentialsForRequestedPredicates = presentationPredicates,
             selfAttestedAttributes = presentationSelfAttestations,
@@ -302,7 +302,7 @@ private fun ProofExchangePresentationScreenView(
             val proofEx = presentationDetails.proofExchange as ProofExchange.Aries
             val retrievedCreds = presentationDetails.retrievedCredentials
             val anoncredProofRequest =
-                (proofEx.formatData as AriesProofExchangeFormatData.Indy).proofRequest
+                (proofEx.formatData as AriesProofExchangeFormatData.Anoncred).proofRequest
 
             LazyColumn(Modifier.weight(1.0f)) {
                 item {
@@ -511,7 +511,7 @@ private fun DefaultPreview() {
                     connectionId = "conn1",
                     initiator = ProofExchangeInitiator.EXTERNAL,
                     state = ProofExchangeState.Aries.REQUEST,
-                    formatData = AriesProofExchangeFormatData.Indy(
+                    formatData = AriesProofExchangeFormatData.Anoncred(
                         AnoncredProofRequestInfo(
                             "ProofReq",
                             "1.0",
@@ -544,7 +544,7 @@ private fun DefaultPreview() {
                     errorMessage = null,
                     tags = listOf(),
                 ),
-                retrievedCredentials = RetrievedPresentationCredentials.Indy(
+                retrievedCredentials = RetrievedPresentationCredentials.Anoncred(
                     credentialsForRequestedAttributes =
                     mapOf(
                         "1" to listOf("cred1", "cred2"),

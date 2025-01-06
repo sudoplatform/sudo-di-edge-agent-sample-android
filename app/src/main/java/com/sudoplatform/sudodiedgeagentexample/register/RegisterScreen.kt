@@ -44,6 +44,7 @@ import com.sudoplatform.sudodiedgeagentexample.utils.showToast
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -81,14 +82,19 @@ fun RegisterScreen(
         isLoading = true
 
         try {
-            withContext(Dispatchers.IO) {
-                sudoManager.signInUser()
+            // run sign-in logic is parallel
+            val sudoSignInJob = async {
+                withContext(Dispatchers.IO) {
+                    sudoManager.signInUser()
+                }
             }
             val config = WalletConfiguration(WALLET_ID, WALLET_PASSPHRASE)
             if (!agent.wallet.exists(WALLET_ID)) {
                 agent.wallet.create(config)
             }
             agent.wallet.open(config)
+
+            sudoSignInJob.await()
 
             isLoading = false
             navController.navigate(Routes.HOME)

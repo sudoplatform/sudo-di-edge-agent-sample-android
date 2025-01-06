@@ -54,7 +54,7 @@ android {
 
 dependencies {
 
-    implementation("com.sudoplatform:sudodiedgeagent:4.0.0")
+    implementation("com.sudoplatform:sudodiedgeagent:5.0.0")
     // required transitive dep of Edge Agent SDK
     implementation("net.java.dev.jna:jna:5.14.0@aar")
 

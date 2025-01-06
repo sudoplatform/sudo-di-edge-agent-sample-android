@@ -28,8 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
@@ -43,6 +41,7 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.StringOrNumber
 import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
 import com.sudoplatform.sudodiedgeagentexample.credential.AnoncredCredentialInfoColumn
 import com.sudoplatform.sudodiedgeagentexample.credential.SdJwtCredentialInfoColumn
+import com.sudoplatform.sudodiedgeagentexample.credential.UICredential
 import com.sudoplatform.sudodiedgeagentexample.credential.W3cCredentialInfoColumn
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.asString
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
@@ -64,7 +63,7 @@ import kotlinx.serialization.json.buildJsonObject
 fun SelectCredentialForDifItemModal(
     onDismissRequest: () -> Unit,
     descriptor: InputDescriptorV2,
-    suitableCredentials: List<Credential>,
+    suitableCredentials: List<UICredential>,
     onSelect: (credentialId: String) -> Unit,
 ) {
     ModalBottomSheet(
@@ -166,7 +165,7 @@ fun SelectCredentialForDifItemModal(
             }
             items(
                 items = suitableCredentials,
-                key = { it.credentialId },
+                key = { it.id },
             ) { item ->
                 val currentItem = rememberUpdatedState(item)
 
@@ -176,28 +175,21 @@ fun SelectCredentialForDifItemModal(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1.0f)) {
-                            when (val data = currentItem.value.formatData) {
-                                is CredentialFormatData.AnoncredV1 -> AnoncredCredentialInfoColumn(
-                                    id = currentItem.value.credentialId,
-                                    fromSource = currentItem.value.credentialSource,
-                                    metadata = data.credentialMetadata,
-                                    attributes = data.credentialAttributes,
+                            when (val data = currentItem.value) {
+                                is UICredential.Anoncred -> AnoncredCredentialInfoColumn(
+                                    credential = data,
                                 )
 
-                                is CredentialFormatData.SdJwtVc -> SdJwtCredentialInfoColumn(
-                                    id = currentItem.value.credentialId,
-                                    fromSource = currentItem.value.credentialSource,
-                                    sdJwtVc = data.credential,
+                                is UICredential.SdJwtVc -> SdJwtCredentialInfoColumn(
+                                    credential = data,
                                 )
 
-                                is CredentialFormatData.W3C -> W3cCredentialInfoColumn(
-                                    id = currentItem.value.credentialId,
-                                    fromSource = currentItem.value.credentialSource,
-                                    w3cCredential = data.credential,
+                                is UICredential.W3C -> W3cCredentialInfoColumn(
+                                    credential = data,
                                 )
                             }
                             Button(
-                                onClick = { onSelect(currentItem.value.credentialId) },
+                                onClick = { onSelect(currentItem.value.id) },
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(top = 8.dp),
@@ -215,54 +207,47 @@ fun SelectCredentialForDifItemModal(
 @Preview(showBackground = true)
 @Composable
 private fun DefaultPreview() {
-    val w3cCred = Credential(
-        "cred1",
-        "",
-        CredentialSource.DidCommConnection("conn1"),
-        formatData = CredentialFormatData.W3C(
-            W3cCredential(
-                contexts = listOf(),
-                null,
-                types = listOf("Sample"),
-                credentialSubject = listOf(
-                    CredentialSubject(
-                        id = "did:example:123",
-                        properties = JsonObject(
-                            mapOf(
-                                "givenName" to JsonPrimitive("John Smith"),
-                            ),
+    val w3cCred = UICredential.W3C(
+        id = "cred1",
+        source = CredentialSource.DidCommConnection("conn1"),
+        w3cVc = W3cCredential(
+            contexts = listOf(),
+            null,
+            types = listOf("Sample"),
+            credentialSubject = listOf(
+                CredentialSubject(
+                    id = "did:example:123",
+                    properties = JsonObject(
+                        mapOf(
+                            "givenName" to JsonPrimitive("John Smith"),
                         ),
                     ),
                 ),
-                issuer = CredentialIssuer(
-                    "did:example:issuer123",
-                    JsonObject(emptyMap()),
-                ),
-                issuanceDate = "2024-02-12T15:30:45.123Z",
-                null,
-                proof = null,
-                properties = JsonObject(mapOf()),
             ),
+            issuer = CredentialIssuer(
+                "did:example:issuer123",
+                JsonObject(emptyMap()),
+            ),
+            issuanceDate = "2024-02-12T15:30:45.123Z",
+            null,
+            proof = null,
+            properties = JsonObject(mapOf()),
         ),
-        listOf(),
     )
-    val sdJwtVc = Credential(
-        "cred1",
-        "",
-        CredentialSource.OpenId4VcIssuer("did:foo:issuer"),
-        formatData = CredentialFormatData.SdJwtVc(
-            SdJwtVerifiableCredential(
-                compactSdJwt = "foo.bar.xyz",
-                verifiableCredentialType = "accumsan",
-                issuer = "expetenda",
-                validAfter = null,
-                validBefore = null,
-                issuedAt = null,
-                keyBinding = mapOf(),
-                claims = mapOf("foo" to SdJsonElement.Primitive(false, JsonPrimitive("bar"))),
-            ),
+    val sdJwtVc = UICredential.SdJwtVc(
+        id = "cred1",
+        source = CredentialSource.OpenId4VcIssuer("did:foo:issuer"),
+        sdJwtVc =
+        SdJwtVerifiableCredential(
+            compactSdJwt = "foo.bar.xyz",
+            verifiableCredentialType = "accumsan",
+            issuer = "expetenda",
+            validAfter = null,
+            validBefore = null,
+            issuedAt = null,
+            keyBinding = mapOf(),
+            claims = mapOf("foo" to SdJsonElement.Primitive(false, JsonPrimitive("bar"))),
         ),
-        listOf(),
     )
     SudoDIEdgeAgentExampleTheme {
         SelectCredentialForDifItemModal(
@@ -306,8 +291,8 @@ private fun DefaultPreview() {
             ),
             suitableCredentials = listOf(
                 w3cCred,
-                w3cCred.copy(credentialId = "2"),
-                sdJwtVc.copy(credentialId = "3"),
+                w3cCred.copy(id = "2"),
+                sdJwtVc.copy(id = "3"),
             ),
             onSelect = {},
         )

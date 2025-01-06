@@ -17,8 +17,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
-import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 
@@ -28,10 +26,7 @@ import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 @Composable
 fun W3cCredentialInfoColumn(
     modifier: Modifier = Modifier,
-    id: String,
-    fromSource: CredentialSource,
-    w3cCredential: W3cCredential,
-    proofType: JsonLdProofType? = null,
+    credential: UICredential.W3C,
 ) {
     Column(modifier) {
         Text(
@@ -46,30 +41,30 @@ fun W3cCredentialInfoColumn(
                 .fillMaxWidth()
                 .padding(vertical = 16.dp),
         ) {
-            NameValueTextColumn("ID", id)
-            when (fromSource) {
+            NameValueTextColumn("ID", credential.id)
+            when (val source = credential.source) {
                 is CredentialSource.DidCommConnection -> NameValueTextColumn(
                     "From Connection",
-                    fromSource.connectionId,
+                    source.connectionId,
                 )
 
                 is CredentialSource.OpenId4VcIssuer -> NameValueTextColumn(
                     "From OID Issuer",
-                    fromSource.issuerUrl,
+                    source.issuerUrl,
                 )
             }
             NameValueTextColumn("Format", "W3C")
-            NameValueTextColumn("Issuer", w3cCredential.issuer.id)
-            NameValueTextColumn("Issuance Date", w3cCredential.issuanceDate)
+            NameValueTextColumn("Issuer", credential.w3cVc.issuer.id)
+            NameValueTextColumn("Issuance Date", credential.w3cVc.issuanceDate)
             NameValueTextColumn(
                 "Type",
-                w3cCredential.types.find { it != "VerifiableCredential" } ?: "",
+                credential.w3cVc.types.find { it != "VerifiableCredential" } ?: "",
             )
-            proofType?.let {
+            credential.proofType?.let {
                 NameValueTextColumn("Issuer Proof Type", it.toString())
             }
         }
-        w3cCredential.credentialSubject.forEachIndexed { i, credSubject ->
+        credential.w3cVc.credentialSubject.forEachIndexed { i, credSubject ->
             HorizontalDivider()
 
             Text(

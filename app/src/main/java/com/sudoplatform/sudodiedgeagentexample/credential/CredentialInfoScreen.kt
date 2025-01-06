@@ -24,32 +24,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
-import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialAttribute
-import com.sudoplatform.sudodiedgeagent.credentials.types.AnoncredV1CredentialMetadata
 import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialDefinitionInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
-import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProof
-import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
-import com.sudoplatform.sudodiedgeagent.credentials.types.ProofPurpose
-import com.sudoplatform.sudodiedgeagent.credentials.types.SchemaInfo
-import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
-import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
-import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
+import com.sudoplatform.sudodiedgeagentexample.utils.PreviewDataHelper
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
 
 @Composable
 fun CredentialInfoScreen(
@@ -59,24 +39,25 @@ fun CredentialInfoScreen(
 ) {
     val context = LocalContext.current
 
-    var credential: Credential? by remember { mutableStateOf(null) }
+    var credential: UICredential? by remember { mutableStateOf(null) }
 
     /**
-     * When this composable initializes, load the [Credential] from the ID that was
-     * passed in. Displaying an error toast if the [Credential] cannot be found in the
-     * agent (should be logically impossible/unlikely).
+     * When this composable initializes, load the [UICredential] from the ID that was
+     * passed in, and load any additional required data.
+     * Displaying an error toast if the [Credential] cannot be found in the
+     * agent (should be logically impossible/unlikely), or if construction of the
+     * [UICredential] fails (i.e. fails to resolve additional data).
      */
     LaunchedEffect(key1 = Unit) {
         runCatching {
-            val loadedCredEx = agent.credentials.getById(credentialId)
+            val loadedCred = agent.credentials.getById(credentialId)
                 ?: throw Exception("Could not find credential")
-            credential = loadedCredEx
+
+            credential = UICredential.fromCredential(agent, loadedCred)
         }.showToastOnFailure(context, logger, "Failed to load credential")
     }
 
-    CredentialInfoScreenView(
-        credential,
-    )
+    CredentialInfoScreenView(credential)
 }
 
 /**
@@ -85,7 +66,9 @@ fun CredentialInfoScreen(
  * UI will display a loading spinner until [credential] becomes non-null.
  */
 @Composable
-fun CredentialInfoScreenView(credential: Credential?) {
+fun CredentialInfoScreenView(
+    credential: UICredential?,
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -102,27 +85,19 @@ fun CredentialInfoScreenView(credential: Credential?) {
                         CircularProgressIndicator(Modifier.padding(vertical = 8.dp))
                     }
                 } else {
-                    when (val formatData = credential.formatData) {
-                        is CredentialFormatData.AnoncredV1 -> AnoncredCredentialInfoColumn(
+                    when (credential) {
+                        is UICredential.Anoncred -> AnoncredCredentialInfoColumn(
                             Modifier.weight(1.0f),
-                            id = credential.credentialId,
-                            fromSource = credential.credentialSource,
-                            metadata = formatData.credentialMetadata,
-                            attributes = formatData.credentialAttributes,
+                            credential = credential,
                         )
 
-                        is CredentialFormatData.W3C -> W3cCredentialInfoColumn(
-                            id = credential.credentialId,
-                            fromSource = credential.credentialSource,
-                            w3cCredential = formatData.credential,
-                            proofType = formatData.credential.proof?.firstOrNull()?.proofType,
+                        is UICredential.W3C -> W3cCredentialInfoColumn(
+                            credential = credential,
                         )
 
-                        is CredentialFormatData.SdJwtVc -> SdJwtCredentialInfoColumn(
+                        is UICredential.SdJwtVc -> SdJwtCredentialInfoColumn(
                             Modifier.weight(1.0f),
-                            id = credential.credentialId,
-                            fromSource = credential.credentialSource,
-                            sdJwtVc = formatData.credential,
+                            credential = credential,
                         )
                     }
                 }
@@ -136,24 +111,7 @@ fun CredentialInfoScreenView(credential: Credential?) {
 private fun PreviewAnoncred() {
     SudoDIEdgeAgentExampleTheme {
         CredentialInfoScreenView(
-            credential = Credential(
-                "cred1",
-                "credEx1",
-                CredentialSource.DidCommConnection("conn1"),
-                CredentialFormatData.AnoncredV1(
-                    AnoncredV1CredentialMetadata(
-                        "credDef1",
-                        CredentialDefinitionInfo("My Cred Def 1"),
-                        "schema1",
-                        SchemaInfo("My Schema 1", "1.0"),
-                    ),
-                    listOf(
-                        AnoncredV1CredentialAttribute("Attribute 1", "Value 1", null),
-                        AnoncredV1CredentialAttribute("Attribute 2", "Value 2", null),
-                    ),
-                ),
-                listOf(),
-            ),
+            credential = PreviewDataHelper.dummyUICredentialAnoncred(),
         )
     }
 }
@@ -161,55 +119,9 @@ private fun PreviewAnoncred() {
 @Preview(showBackground = true)
 @Composable
 private fun PreviewW3c() {
-    val sub = CredentialSubject(
-        "did:foo:holder1",
-        properties = buildJsonObject {
-            put("attribute 1", "value 1")
-            put("attribute 2", 2)
-            putJsonObject("attribute 3") {
-                put("attribute 3.1", 3.1)
-                putJsonArray("attributes 3.2") {
-                    add(3.2)
-                    add("3.2")
-                }
-            }
-        },
-    )
     SudoDIEdgeAgentExampleTheme {
         CredentialInfoScreenView(
-            credential = Credential(
-                "cred1",
-                "credEx1",
-                CredentialSource.OpenId4VcIssuer("https://issuer.com"),
-                CredentialFormatData.W3C(
-                    W3cCredential(
-                        contexts = emptyList(),
-                        id = null,
-                        types = listOf("Foobar"),
-                        credentialSubject = listOf(
-                            sub,
-                            sub,
-                            sub,
-                        ),
-                        issuer = CredentialIssuer("did:foo:issuer1", JsonObject(emptyMap())),
-                        issuanceDate = "2018-04-01T15:20:15Z",
-                        expirationDate = null,
-                        proof = listOf(
-                            JsonLdProof(
-                                JsonLdProofType.BBS_BLS_SIGNATURE2020,
-                                "",
-                                "",
-                                ProofPurpose.ASSERTION_METHOD,
-                                JsonObject(
-                                    emptyMap(),
-                                ),
-                            ),
-                        ),
-                        properties = JsonObject(emptyMap()),
-                    ),
-                ),
-                listOf(),
-            ),
+            credential = PreviewDataHelper.dummyUICredentialW3C(),
         )
     }
 }
@@ -219,27 +131,7 @@ private fun PreviewW3c() {
 private fun PreviewSdJwt() {
     SudoDIEdgeAgentExampleTheme {
         CredentialInfoScreenView(
-            credential = Credential(
-                "cred1",
-                "credEx1",
-                CredentialSource.OpenId4VcIssuer("https://issuer.com"),
-                CredentialFormatData.SdJwtVc(
-                    SdJwtVerifiableCredential(
-                        compactSdJwt = "j.w.t~",
-                        verifiableCredentialType = "UniversityDegree",
-                        issuer = "did:foo:bar",
-                        validAfter = null,
-                        validBefore = null,
-                        issuedAt = 1727244595u,
-                        keyBinding = null,
-                        claims = mapOf(
-                            "code" to SdJsonElement.Primitive(true, JsonPrimitive("Math")),
-                            "gpa" to SdJsonElement.Primitive(true, JsonPrimitive(4)),
-                        ),
-                    ),
-                ),
-                listOf(),
-            ),
+            credential = PreviewDataHelper.dummyUICredentialSdJwt(),
         )
     }
 }

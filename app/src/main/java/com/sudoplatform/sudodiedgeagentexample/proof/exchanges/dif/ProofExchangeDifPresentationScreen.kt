@@ -38,12 +38,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
-import com.sudoplatform.sudodiedgeagent.credentials.types.Credential
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialFormatData
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialIssuer
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
-import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
-import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.PresentationCredentials
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchange
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeInitiator
@@ -54,15 +48,15 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV1
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV2
+import com.sudoplatform.sudodiedgeagentexample.credential.UICredential
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.getPresentationDefinitionV2
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
+import com.sudoplatform.sudodiedgeagentexample.utils.PreviewDataHelper
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Encapsulates all relevant details fetched for the UI of this presentation screen.
@@ -70,7 +64,7 @@ import kotlinx.serialization.json.JsonPrimitive
 data class DifPresentationDetails(
     val proofExchange: ProofExchange,
     val request: PresentationDefinitionV2,
-    val credentialsForRequestedDescriptors: Map<String, List<Credential>>,
+    val credentialsForRequestedDescriptors: Map<String, List<UICredential>>,
 )
 
 @Composable
@@ -124,10 +118,12 @@ fun ProofExchangeDifPresentationScreen(
                 retrievedCredentials.credentialsForRequestedDescriptors.flatMap { it.value }.toSet()
             val uniqueCreds = uniqueCredIds.map {
                 agent.credentials.getById(it) ?: throw Exception("Could not find credential")
+            }.map {
+                UICredential.fromCredential(agent, it)
             }
             val credentialsForRequestedDescriptors =
                 retrievedCredentials.credentialsForRequestedDescriptors.mapValues { (_, credIds) ->
-                    credIds.map { credId -> uniqueCreds.first { it.credentialId == credId } }
+                    credIds.map { credId -> uniqueCreds.first { it.id == credId } }
                 }
 
             presentationDetails =
@@ -397,39 +393,7 @@ private fun DefaultPreview() {
                     submissionRequirements = listOf(),
                 ),
                 credentialsForRequestedDescriptors = mapOf(
-                    "1" to listOf(
-                        Credential(
-                            "cred1",
-                            "",
-                            CredentialSource.DidCommConnection("conn1"),
-                            formatData = CredentialFormatData.W3C(
-                                W3cCredential(
-                                    contexts = listOf(),
-                                    null,
-                                    types = listOf(),
-                                    credentialSubject = listOf(
-                                        CredentialSubject(
-                                            id = "did:example:123",
-                                            properties = JsonObject(
-                                                mapOf(
-                                                    "givenName" to JsonPrimitive("John Smith"),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                    issuer = CredentialIssuer(
-                                        "did:example:issuer123",
-                                        JsonObject(emptyMap()),
-                                    ),
-                                    issuanceDate = "2024-02-12T15:30:45.123Z",
-                                    null,
-                                    proof = null,
-                                    properties = JsonObject(mapOf()),
-                                ),
-                            ),
-                            listOf(),
-                        ),
-                    ),
+                    "1" to listOf(PreviewDataHelper.dummyUICredentialW3C()),
                 ),
             ),
             {},
