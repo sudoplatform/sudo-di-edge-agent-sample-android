@@ -32,6 +32,7 @@ import com.sudoplatform.sudodiedgeagentexample.credential.CredentialInfoScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.CredentialsScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.exchange.CredentialExchangeInfoScreen
 import com.sudoplatform.sudodiedgeagentexample.credential.exchange.CredentialExchangeScreen
+import com.sudoplatform.sudodiedgeagentexample.dids.DidsScreen
 import com.sudoplatform.sudodiedgeagentexample.home.HomeScreen
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.ProofExchangeScreen
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.anoncred.ProofExchangeAnoncredPresentationScreen
@@ -45,6 +46,7 @@ import kotlinx.coroutines.launch
 object Routes {
     const val REGISTER = "register"
     const val HOME = "home"
+    const val DIDS = "dids"
     const val CONNECTION_EXCHANGES = "connExs"
     const val CONNECTION_INVITATION_SCANNER = "connInvitationScanner"
     const val CONNECTION_INVITATION_CREATE = "connInvitationCreate"
@@ -131,6 +133,12 @@ fun MainNavigation(
                 sudoManager = sudoManager,
                 logger = logger,
                 pendingDeepLinks = pendingDeepLinks,
+            )
+        }
+        composable(Routes.DIDS) {
+            DidsScreen(
+                agent = agent,
+                logger = logger,
             )
         }
         composable(Routes.CONNECTION_EXCHANGES) {

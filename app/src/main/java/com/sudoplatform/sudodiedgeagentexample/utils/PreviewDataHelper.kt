@@ -115,6 +115,7 @@ object PreviewDataHelper {
                 validAfter = null,
                 validBefore = null,
                 issuedAt = 1727244595u,
+                subject = "did:foo:holder",
                 keyBinding = null,
                 claims = mapOf(
                     "code" to SdJsonElement.Primitive(true, JsonPrimitive("Math")),

@@ -143,7 +143,7 @@ fun HomeScreen(
 }
 
 /**
- * UI for the "Home screen". Allows toggling of the Agent's run loop on and off,
+ * UI for the "Home screen". Allows toggling of the Agent's DIDComm run loop on and off,
  * and navigation to several of the sub pages.
  */
 @Composable
@@ -160,7 +160,10 @@ fun HomeScreenView(
         verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
     ) {
         Button(onClick = toggleAgentRunning, Modifier.fillMaxWidth()) {
-            Text(text = if (isAgentRunning) "Stop Agent" else "Run Agent")
+            Text(text = if (isAgentRunning) "Stop DIDComm" else "Start DIDComm")
+        }
+        Button(onClick = { navigateTo(Routes.DIDS) }, Modifier.fillMaxWidth()) {
+            Text(text = "DIDs")
         }
         Button(onClick = { navigateTo(Routes.CONNECTION_EXCHANGES) }, Modifier.fillMaxWidth()) {
             Text(text = "Connection Exchanges")

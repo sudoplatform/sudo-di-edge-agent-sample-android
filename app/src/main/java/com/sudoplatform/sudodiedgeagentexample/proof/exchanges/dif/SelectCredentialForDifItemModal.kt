@@ -241,10 +241,11 @@ private fun DefaultPreview() {
         SdJwtVerifiableCredential(
             compactSdJwt = "foo.bar.xyz",
             verifiableCredentialType = "accumsan",
-            issuer = "expetenda",
+            issuer = "did:foo:issuer",
             validAfter = null,
             validBefore = null,
             issuedAt = null,
+            subject = "did:foo:holder",
             keyBinding = mapOf(),
             claims = mapOf("foo" to SdJsonElement.Primitive(false, JsonPrimitive("bar"))),
         ),

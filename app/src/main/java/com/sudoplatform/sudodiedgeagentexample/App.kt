@@ -13,6 +13,7 @@ import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.configuration.AgentConfiguration
 import com.sudoplatform.sudodiedgeagent.configuration.NetworkConfiguration
 import com.sudoplatform.sudodiedgeagent.configuration.PeerConnectionConfiguration
+import com.sudoplatform.sudodiedgeagent.plugins.externalcryptoprovider.hardware.AndroidHardwareCryptoProvider
 import com.sudoplatform.sudologging.AndroidUtilsLogDriver
 import com.sudoplatform.sudologging.LogLevel
 import com.sudoplatform.sudologging.Logger
@@ -96,8 +97,13 @@ class App : Application() {
         )
 
         /** construct the agent via convenience builder */
-        agent = SudoDIEdgeAgent.builder().setContext(this).setAgentConfiguration(agentConfiguration)
-            .setLogger(logger).build()
+        agent = SudoDIEdgeAgent.builder()
+            .setContext(this)
+            .setAgentConfiguration(agentConfiguration)
+            .setLogger(logger)
+            // register the android hardware crypto provider to make Strongbox/TEE key options available
+            .registerExternalCryptoProvider(AndroidHardwareCryptoProvider())
+            .build()
     }
 }
 

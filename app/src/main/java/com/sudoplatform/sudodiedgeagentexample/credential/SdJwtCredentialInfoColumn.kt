@@ -56,13 +56,13 @@ fun SdJwtCredentialInfoColumn(
                 )
             }
             NameValueTextColumn("Format", "SD-JWT")
-            NameValueTextColumn("Issuer", credential.sdJwtVc.issuer)
             credential.sdJwtVc.issuedAt?.let {
                 NameValueTextColumn(
                     "Issuance Date",
                     Date.from(Instant.ofEpochSecond(it.toLong())).toString(),
                 )
             }
+            NameValueTextColumn("Subject", credential.sdJwtVc.subject ?: "None")
             NameValueTextColumn(
                 "Type",
                 credential.sdJwtVc.verifiableCredentialType,
