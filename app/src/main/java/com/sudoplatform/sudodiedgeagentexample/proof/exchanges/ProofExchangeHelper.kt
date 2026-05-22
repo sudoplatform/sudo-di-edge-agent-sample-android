@@ -13,9 +13,7 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.anoncred.AnoncredP
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.aries.AriesProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV1
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV1
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV2
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.StringOrNumber
 
 /**
@@ -97,45 +95,15 @@ fun StringOrNumber.asString(): String {
 }
 
 /**
- * get the [PresentationDefinitionV2] attached to this [ProofExchange] (if any).
- * [PresentationDefinitionV1]s are converted to [PresentationDefinitionV2] if needed.
+ * get the [PresentationDefinitionV1] attached to this [ProofExchange] (if any).
  */
-fun ProofExchange.getPresentationDefinitionV2(): PresentationDefinitionV2? {
+fun ProofExchange.getPresentationDefinitionV1(): PresentationDefinitionV1? {
     return when (this) {
         is ProofExchange.Aries -> when (val data = formatData) {
-            is AriesProofExchangeFormatData.Dif -> data.requestedPresentationDefinition.toV2()
+            is AriesProofExchangeFormatData.Dif -> data.requestedPresentationDefinition
             is AriesProofExchangeFormatData.Anoncred -> null
         }
 
-        is ProofExchange.OpenId4Vc -> presentationRequest
+        is ProofExchange.OpenId4Vc -> null
     }
-}
-
-private fun PresentationDefinitionV1.toV2(): PresentationDefinitionV2 {
-    return PresentationDefinitionV2(
-        id = id ?: "N/A",
-        inputDescriptors = inputDescriptors.map { it.toV2() },
-        name = name,
-        purpose = purpose,
-        submissionRequirements = submissionRequirements,
-
-    )
-}
-
-private fun InputDescriptorV1.toV2(): InputDescriptorV2 {
-    return InputDescriptorV2(
-        id = id,
-        name = name,
-        purpose = purpose,
-        constraints = constraints ?: Constraints(
-            limitDisclosure = null,
-            statuses = null,
-            subjectIsIssuer = null,
-            isHolder = listOf(),
-            sameSubject = listOf(),
-            fields = listOf(),
-
-        ),
-        group = group,
-    )
 }

@@ -1,6 +1,6 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
 buildscript {
-    val kotlinVersion = "1.9.21"
+    val kotlinVersion = "2.3.21"
 
     repositories {
         mavenLocal()
@@ -9,9 +9,9 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("com.android.tools.build:gradle:8.1.4")
+        classpath("com.android.tools.build:gradle:9.2.1")
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion")
-        classpath("org.owasp:dependency-check-gradle:8.4.0")
+        classpath("org.owasp:dependency-check-gradle:12.2.2")
     }
 }
 

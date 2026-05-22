@@ -11,6 +11,7 @@ import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
 import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredentialSecuring
 
 /**
  * Wrapper around the Edge Agent [Credential] with extra collected/resolve data
@@ -65,6 +66,7 @@ sealed interface UICredential {
                     id = credential.credentialId,
                     source = credential.credentialSource,
                     w3cVc = formatData.credential,
+                    securingMechanism = formatData.securing,
                     proofType = formatData.credential.proof?.firstOrNull()?.proofType,
                 )
             }
@@ -103,6 +105,7 @@ sealed interface UICredential {
                     id = id,
                     source = source,
                     w3cVc = formatData.credential,
+                    securingMechanism = formatData.securing,
                     proofType = formatData.credential.proof?.firstOrNull()?.proofType,
                 )
             }
@@ -142,8 +145,15 @@ sealed interface UICredential {
         override val id: String,
         override val source: CredentialSource,
         val w3cVc: W3cCredential,
+        val securingMechanism: W3cCredentialSecuring,
         val proofType: JsonLdProofType? = null,
-    ) : UICredential
+    ) : UICredential {
+        val previewSecuringMechanism: String
+            get() = when (this.securingMechanism) {
+                is W3cCredentialSecuring.LinkedDataProof -> "ldp_vc"
+                is W3cCredentialSecuring.SdJwt -> "vc+sd-jwt"
+            }
+    }
 
     data class SdJwtVc(
         override val id: String,

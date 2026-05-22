@@ -17,13 +17,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -33,10 +32,12 @@ import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSubject
 import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredentialSecuring
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Field
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Filter
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorSchema
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV1
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.StringOrNumber
 import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
 import com.sudoplatform.sudodiedgeagentexample.credential.AnoncredCredentialInfoColumn
@@ -62,13 +63,13 @@ import kotlinx.serialization.json.buildJsonObject
 @Composable
 fun SelectCredentialForDifItemModal(
     onDismissRequest: () -> Unit,
-    descriptor: InputDescriptorV2,
+    descriptor: InputDescriptorV1,
     suitableCredentials: List<UICredential>,
     onSelect: (credentialId: String) -> Unit,
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        sheetState = SheetState(skipPartiallyExpanded = true, density = LocalDensity.current),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         LazyColumn(
             Modifier
@@ -85,7 +86,7 @@ fun SelectCredentialForDifItemModal(
                 )
                 NameValueTextColumn(name = "Name", value = descriptor.name ?: "None")
                 NameValueTextColumn(name = "Purpose", value = descriptor.purpose ?: "None")
-                descriptor.constraints.fields.forEachIndexed { index, field ->
+                descriptor.constraints?.fields?.forEachIndexed { index, field ->
                     NameValueTextRow(name = "Constraint #$index", value = "")
                     NameValueTextColumn(
                         name = "Constraint Purpose",
@@ -210,7 +211,7 @@ private fun DefaultPreview() {
     val w3cCred = UICredential.W3C(
         id = "cred1",
         source = CredentialSource.DidCommConnection("conn1"),
-        w3cVc = W3cCredential(
+        w3cVc = W3cCredential.V1(
             contexts = listOf(),
             null,
             types = listOf("Sample"),
@@ -229,10 +230,11 @@ private fun DefaultPreview() {
                 JsonObject(emptyMap()),
             ),
             issuanceDate = "2024-02-12T15:30:45.123Z",
-            null,
+            expirationDate = null,
             proof = null,
             properties = JsonObject(mapOf()),
         ),
+        securingMechanism = W3cCredentialSecuring.LinkedDataProof
     )
     val sdJwtVc = UICredential.SdJwtVc(
         id = "cred1",
@@ -253,10 +255,12 @@ private fun DefaultPreview() {
     SudoDIEdgeAgentExampleTheme {
         SelectCredentialForDifItemModal(
             onDismissRequest = { },
-            descriptor = InputDescriptorV2(
+            descriptor = InputDescriptorV1(
                 "1",
                 name = "Proof of Residency",
                 purpose = "Prove you are a resident",
+                schema = InputDescriptorSchema.Schemas(listOf()),
+                group = null,
                 constraints = Constraints(
                     limitDisclosure = null,
                     statuses = null,

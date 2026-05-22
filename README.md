@@ -8,7 +8,7 @@ This project provides examples for how to use the Sudo DI Edge Agent Android SDK
 | Technology             | Supported version |
 |------------------------|-------------------|
 | Min. Deployment Target | 26                |
-| Kotlin version         | 1.9+              |
+| Kotlin version         | 2.3+              |
 
 ## Getting Started
 

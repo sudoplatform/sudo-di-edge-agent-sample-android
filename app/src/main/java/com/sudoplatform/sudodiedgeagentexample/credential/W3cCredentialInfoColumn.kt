@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredentialSecuring
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
 
@@ -54,8 +56,10 @@ fun W3cCredentialInfoColumn(
                 )
             }
             NameValueTextColumn("Format", "W3C")
+            NameValueTextColumn("VCDM Version", if (credential.w3cVc is W3cCredential.V1) "V1" else "V2")
+            NameValueTextColumn("Secured with", credential.previewSecuringMechanism)
             NameValueTextColumn("Issuer", credential.w3cVc.issuer.id)
-            NameValueTextColumn("Issuance Date", credential.w3cVc.issuanceDate)
+            NameValueTextColumn("Issuance Date", credential.w3cVc.effectiveValidFrom ?: "N/A")
             NameValueTextColumn(
                 "Type",
                 credential.w3cVc.types.find { it != "VerifiableCredential" } ?: "",

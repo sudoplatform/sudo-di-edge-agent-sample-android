@@ -329,7 +329,7 @@ private fun DefaultPreview() {
                         CredentialExchangeInitiator.EXTERNAL,
                         formatData = AriesCredentialExchangeFormatData.AriesLdProof(
                             currentProposedCredential =
-                            W3cCredential(
+                            W3cCredential.V1(
                                 contexts = emptyList(),
                                 id = null,
                                 types = listOf("Foobar"),

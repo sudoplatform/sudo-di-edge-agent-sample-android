@@ -10,6 +10,7 @@ import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchange
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.aries.AriesCredentialExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.credentials.types.CredentialSource
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredentialSecuring
 import com.sudoplatform.sudodiedgeagentexample.credential.UICredential
 
 /**
@@ -55,6 +56,7 @@ sealed interface UICredentialExchange {
                     id = exchange.credentialExchangeId,
                     source = source,
                     w3cVc = formatData.currentProposedCredential,
+                    securingMechanism = W3cCredentialSecuring.LinkedDataProof,
                     proofType = formatData.currentProposedProofType,
                 )
             }

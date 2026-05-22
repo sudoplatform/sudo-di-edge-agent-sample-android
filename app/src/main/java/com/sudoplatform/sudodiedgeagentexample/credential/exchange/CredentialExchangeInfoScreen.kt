@@ -21,7 +21,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetState
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -35,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -547,7 +546,7 @@ private fun SelectDidModal(
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismissRequest,
-        sheetState = SheetState(skipPartiallyExpanded = true, density = LocalDensity.current),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     ) {
         LazyColumn(
             Modifier
@@ -719,7 +718,7 @@ private fun Oid4vcUnauthorizedPreview() {
                         "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
                             display = null,
                             vct = "UniversityDegree",
-                            claims = mapOf(),
+                            claims = listOf(),
                             allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
                                 emptyList(),
                                 emptyList(),
@@ -764,7 +763,7 @@ private fun Oid4vcAuthorizedPreview() {
                         "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
                             display = null,
                             vct = "UniversityDegree",
-                            claims = mapOf(),
+                            claims = listOf(),
                             allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
                                 emptyList(),
                                 emptyList(),
@@ -811,7 +810,7 @@ private fun Oid4vcIssuedPreview() {
                         "UniversityDegreeSdJwt" to OpenId4VcCredentialConfiguration.SdJwtVc(
                             display = null,
                             vct = "UniversityDegree",
-                            claims = mapOf(),
+                            claims = listOf(),
                             allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
                                 emptyList(),
                                 emptyList(),

@@ -36,6 +36,7 @@ import com.sudoplatform.sudodiedgeagentexample.dids.DidsScreen
 import com.sudoplatform.sudodiedgeagentexample.home.HomeScreen
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.ProofExchangeScreen
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.anoncred.ProofExchangeAnoncredPresentationScreen
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.dcql.ProofExchangeDcqlPresentationScreen
 import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.dif.ProofExchangeDifPresentationScreen
 import com.sudoplatform.sudodiedgeagentexample.register.RegisterScreen
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
@@ -60,6 +61,7 @@ object Routes {
 
     const val PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE = "anoncred"
     const val PROOF_EXCHANGE_PRESENTATION_DIF_TYPE = "dif"
+    const val PROOF_EXCHANGE_PRESENTATION_DCQL_TYPE = "dcql"
     const val PROOF_EXCHANGE_PRESENTATION = "proofExPresentation"
 }
 
@@ -229,6 +231,13 @@ fun MainNavigation(
                 )
 
                 Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE -> ProofExchangeDifPresentationScreen(
+                    navController = navController,
+                    proofExchangeId = proofExId,
+                    agent = agent,
+                    logger = logger,
+                )
+
+                Routes.PROOF_EXCHANGE_PRESENTATION_DCQL_TYPE -> ProofExchangeDcqlPresentationScreen(
                     navController = navController,
                     proofExchangeId = proofExId,
                     agent = agent,

@@ -96,8 +96,8 @@ fun ProofExchangeScreen(
                 is AriesProofExchangeFormatData.Dif -> Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE
                 is AriesProofExchangeFormatData.Anoncred -> Routes.PROOF_EXCHANGE_PRESENTATION_ANONCREDS_TYPE
             }
-            // openid4vp always with DIF
-            is ProofExchange.OpenId4Vc -> Routes.PROOF_EXCHANGE_PRESENTATION_DIF_TYPE
+            // openid4vp uses DCQL
+            is ProofExchange.OpenId4Vc -> Routes.PROOF_EXCHANGE_PRESENTATION_DCQL_TYPE
         }
         navController.navigate("${Routes.PROOF_EXCHANGE_PRESENTATION}/$proofType/${item.proofExchangeId}")
     }

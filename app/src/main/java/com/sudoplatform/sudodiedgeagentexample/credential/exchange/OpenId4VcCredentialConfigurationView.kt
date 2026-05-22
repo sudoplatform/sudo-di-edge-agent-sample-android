@@ -34,6 +34,7 @@ import com.sudoplatform.sudodiedgeagentexample.R
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextRow
+import androidx.core.graphics.toColorInt
 
 private data class DisplayDetails(
     val name: String = "",
@@ -65,10 +66,10 @@ fun OpenId4VcCredentialConfigurationView(
         display ?: return DisplayDetails()
         try {
             val backgroundColor = display.backgroundColor?.let {
-                Color(android.graphics.Color.parseColor(it))
+                Color(it.toColorInt())
             } ?: Color.Unspecified
             val textColor = display.textColor?.let {
-                Color(android.graphics.Color.parseColor(it))
+                Color(it.toColorInt())
             } ?: Color.Unspecified
 
             return DisplayDetails(
@@ -78,74 +79,76 @@ fun OpenId4VcCredentialConfigurationView(
                 textColor = textColor,
                 logoImageUri = display.logo?.uri ?: issuerDisplay?.logo?.uri,
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return DisplayDetails()
         }
     }
 
-    when (configuration) {
-        is OpenId4VcCredentialConfiguration.SdJwtVc -> {
-            val display = configuration.display?.firstOrNull()
-            val displayDetails = tryParseDisplay(display, issuerDisplay.firstOrNull())
+    val title = when (configuration) {
+        is OpenId4VcCredentialConfiguration.SdJwtVc -> "IETF SD-JWT VC: ${configuration.vct}"
+        is OpenId4VcCredentialConfiguration.LdpVc -> "W3C LDP: ${configuration.w3cVcType.joinToString()}"
+        is OpenId4VcCredentialConfiguration.VcSdJwt -> "W3C SD-JWT: ${configuration.w3cVcType.joinToString()}"
+    }
 
-            Card(
-                Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = displayDetails.bgColor),
-            ) {
-                Row(
-                    Modifier
-                        .padding(12.dp)
-                        .fillMaxWidth(),
-                ) {
-                    Column(Modifier.weight(1.0f)) {
-                        Text(
-                            text = "SD-JWT VC: ${configuration.vct}",
-                            fontWeight = FontWeight.Bold,
-                            color = displayDetails.textColor,
-                        )
-                        display?.let {
-                            NameValueTextRow(
-                                name = "Name",
-                                value = it.name,
-                                color = displayDetails.textColor,
-                            )
-                            NameValueTextColumn(
-                                name = "Description",
-                                value = it.description ?: "",
-                                color = displayDetails.textColor,
-                            )
-                        }
+    val display = configuration.display?.firstOrNull()
+    val displayDetails = tryParseDisplay(display, issuerDisplay.firstOrNull())
 
-                        NameValueTextColumn(
-                            "Claims",
-                            configuration.claims.toString(),
-                            color = displayDetails.textColor,
-                        )
-                    }
-                    when (val logoUri = displayDetails.logoImageUri) {
-                        is String -> {
-                            AsyncImage(
-                                model = logoUri,
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .height(40.dp)
-                                    .width(40.dp),
-                                placeholder = painterResource(id = R.drawable.sp_logo),
-                                fallback = painterResource(id = R.drawable.sp_logo),
-                                error = painterResource(id = R.drawable.sp_logo),
-                            )
-                        }
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = displayDetails.bgColor),
+    ) {
+        Row(
+            Modifier
+                .padding(12.dp)
+                .fillMaxWidth(),
+        ) {
+            Column(Modifier.weight(1.0f)) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    color = displayDetails.textColor,
+                )
+                display?.let {
+                    NameValueTextRow(
+                        name = "Name",
+                        value = it.name,
+                        color = displayDetails.textColor,
+                    )
+                    NameValueTextColumn(
+                        name = "Description",
+                        value = it.description ?: "",
+                        color = displayDetails.textColor,
+                    )
+                }
 
-                        null -> {
-                            Image(
-                                painter = painterResource(id = R.drawable.sp_logo),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .height(50.dp)
-                                    .width(50.dp),
-                            )
-                        }
-                    }
+                NameValueTextColumn(
+                    "Claims",
+                    configuration.claims.toString(),
+                    color = displayDetails.textColor,
+                )
+            }
+            when (val logoUri = displayDetails.logoImageUri) {
+                is String -> {
+                    AsyncImage(
+                        model = logoUri,
+                        contentDescription = null,
+                        modifier = Modifier
+                            .height(40.dp)
+                            .width(40.dp),
+                        placeholder = painterResource(id = R.drawable.sp_logo),
+                        fallback = painterResource(id = R.drawable.sp_logo),
+                        error = painterResource(id = R.drawable.sp_logo),
+                    )
+                }
+
+                null -> {
+                    Image(
+                        painter = painterResource(id = R.drawable.sp_logo),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .height(50.dp)
+                            .width(50.dp),
+                    )
                 }
             }
         }
@@ -178,7 +181,7 @@ private fun DefaultPreview() {
                         ),
                     ),
                     vct = "UniversityDegree",
-                    claims = mapOf(),
+                    claims = listOf(),
                     allowedBindingMethods = OpenId4VcAllowedHolderBindingMethods(
                         emptyList(),
                         emptyList(),

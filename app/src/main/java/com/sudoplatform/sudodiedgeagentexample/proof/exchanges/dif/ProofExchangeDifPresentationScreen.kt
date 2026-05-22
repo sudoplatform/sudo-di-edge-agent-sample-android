@@ -45,11 +45,11 @@ import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.ProofExchangeState
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.RetrievedPresentationCredentials
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.aries.AriesProofExchangeFormatData
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.Constraints
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV2
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorSchema
+import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.InputDescriptorV1
 import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV1
-import com.sudoplatform.sudodiedgeagent.proofs.exchange.types.dif.PresentationDefinitionV2
 import com.sudoplatform.sudodiedgeagentexample.credential.UICredential
-import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.getPresentationDefinitionV2
+import com.sudoplatform.sudodiedgeagentexample.proof.exchanges.getPresentationDefinitionV1
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SCREEN_PADDING
 import com.sudoplatform.sudodiedgeagentexample.ui.theme.SudoDIEdgeAgentExampleTheme
 import com.sudoplatform.sudodiedgeagentexample.utils.NameValueTextColumn
@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
  */
 data class DifPresentationDetails(
     val proofExchange: ProofExchange,
-    val request: PresentationDefinitionV2,
+    val request: PresentationDefinitionV1,
     val credentialsForRequestedDescriptors: Map<String, List<UICredential>>,
 )
 
@@ -108,7 +108,7 @@ fun ProofExchangeDifPresentationScreen(
             val proofEx = agent.proofs.exchange.getById(proofExchangeId)
                 ?: throw Exception("Could not find proof exchange")
 
-            val request = proofEx.getPresentationDefinitionV2()
+            val request = proofEx.getPresentationDefinitionV1()
                 ?: throw Exception("ProofExchange is not DIF-based")
 
             val retrievedCredentials =
@@ -172,7 +172,7 @@ fun ProofExchangeDifPresentationScreenView(
      * When not null, indicates that the user is in the process of selecting a credential
      * of the item.
      */
-    var selectingCredentialForDescriptor: InputDescriptorV2? by remember {
+    var selectingCredentialForDescriptor: InputDescriptorV1? by remember {
         mutableStateOf(null)
     }
 
@@ -323,7 +323,7 @@ fun ProofExchangeDifPresentationScreenView(
  */
 @Composable
 private fun RequestedItemCard(
-    inputDescriptor: InputDescriptorV2,
+    inputDescriptor: InputDescriptorV1,
     showCredentialSelection: () -> Unit,
     selectedCredentialId: String?,
 ) {
@@ -371,15 +371,17 @@ private fun DefaultPreview() {
                     errorMessage = null,
                     tags = listOf(),
                 ),
-                request = PresentationDefinitionV2(
+                request = PresentationDefinitionV1(
                     id = "1",
                     name = "Presentation Definition",
                     purpose = "Please present",
                     inputDescriptors = listOf(
-                        InputDescriptorV2(
+                        InputDescriptorV1(
                             "1",
                             name = "Proof of Residency",
                             purpose = "Prove you are a resident",
+                            schema = InputDescriptorSchema.Schemas(listOf()),
+                            group = null,
                             constraints = Constraints(
                                 limitDisclosure = null,
                                 statuses = null,

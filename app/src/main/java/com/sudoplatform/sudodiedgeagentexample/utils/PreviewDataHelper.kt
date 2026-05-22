@@ -17,6 +17,7 @@ import com.sudoplatform.sudodiedgeagent.credentials.types.JsonLdProofType
 import com.sudoplatform.sudodiedgeagent.credentials.types.ProofPurpose
 import com.sudoplatform.sudodiedgeagent.credentials.types.SdJwtVerifiableCredential
 import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredential
+import com.sudoplatform.sudodiedgeagent.credentials.types.W3cCredentialSecuring
 import com.sudoplatform.sudodiedgeagent.types.SdJsonElement
 import com.sudoplatform.sudodiedgeagentexample.credential.UICredential
 import kotlinx.serialization.json.JsonObject
@@ -72,7 +73,7 @@ object PreviewDataHelper {
             },
         )
 
-        return W3cCredential(
+        return W3cCredential.V1(
             contexts = emptyList(),
             id = null,
             types = listOf("Foobar"),
@@ -100,6 +101,7 @@ object PreviewDataHelper {
             id = "cred1",
             source = CredentialSource.OpenId4VcIssuer("https://issuer.com"),
             w3cVc = dummyW3CCredential(),
+            securingMechanism = W3cCredentialSecuring.LinkedDataProof
         )
     }
 
