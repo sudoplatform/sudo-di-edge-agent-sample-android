@@ -54,7 +54,7 @@ dependencies {
 
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
 
-    implementation("com.sudoplatform:sudodiedgeagent:7.0.0")
+    implementation("com.sudoplatform:sudodiedgeagent:8.0.0")
     // required transitive dep of Edge Agent SDK
     implementation("net.java.dev.jna:jna:5.18.1@aar")
 
@@ -73,6 +73,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.browser:browser:1.10.0")
     implementation("androidx.navigation:navigation-compose:2.9.8")
     implementation("io.coil-kt:coil-compose:2.7.0")
 

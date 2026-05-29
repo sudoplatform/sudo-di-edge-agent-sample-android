@@ -6,6 +6,8 @@
 
 package com.sudoplatform.sudodiedgeagentexample.credential.exchange
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.browser.auth.AuthTabIntent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -21,9 +23,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -40,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.navigation.NavController
 import com.sudoplatform.sudodiedgeagent.SudoDIEdgeAgent
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.AcceptCredentialOfferConfiguration
@@ -48,6 +51,7 @@ import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExc
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.CredentialExchangeState
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.aries.AcceptAriesCredentialOfferFormatSpecificConfiguration
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.aries.AriesCredentialExchangeFormatData
+import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.InitiateAuthorizationConfiguration
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.OpenId4VcAllowedHolderBindingMethods
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.OpenId4VcAuthorizeConfiguration
 import com.sudoplatform.sudodiedgeagent.credentials.exchange.types.openid4vc.OpenId4VcBindingMethod
@@ -74,6 +78,9 @@ import com.sudoplatform.sudodiedgeagentexample.utils.PreviewDataHelper
 import com.sudoplatform.sudodiedgeagentexample.utils.showToastOnFailure
 import com.sudoplatform.sudologging.Logger
 import kotlinx.coroutines.launch
+
+/** OAuth client_id used when initiating the authorization code flow. */
+private const val OAUTH_CLIENT_ID = "edge-agent-sample"
 
 /**
  * Application logic data structure for representing the list of [DidInformation]s
@@ -199,7 +206,7 @@ fun CredentialExchangeInfoScreen(
      *
      * On success, the `credentialExchange` is updated to the next state (ready to accept)
      */
-    fun authorizeExchange(txCode: String?) = scope.launch {
+    fun authorizeWithPreAuth(txCode: String?) = scope.launch {
         isAcceptingCredential = true
         runCatching {
             val updatedCredentialExchange =
@@ -212,6 +219,56 @@ fun CredentialExchangeInfoScreen(
             credentialExchange =
                 UICredentialExchange.fromCredentialExchange(agent, updatedCredentialExchange)
         }.showToastOnFailure(context, logger, "Failed to authorize exchange")
+        isAcceptingCredential = false
+    }
+
+    /**
+     * Complete the authorization code flow by passing the redirect URI response
+     * from the Auth Tab back to the SDK.
+     */
+    fun authorizeWithAuthCode(redirectUriResponse: String) = scope.launch {
+        isAcceptingCredential = true
+        runCatching {
+            val updatedCredentialExchange =
+                agent.credentials.exchange.openid4vc.authorizeExchange(
+                    credentialExchangeId,
+                    OpenId4VcAuthorizeConfiguration.WithAuthorizationCode(
+                        redirectUriResponse,
+                    ),
+                )
+            credentialExchange =
+                UICredentialExchange.fromCredentialExchange(agent, updatedCredentialExchange)
+        }.showToastOnFailure(context, logger, "Failed to authorize exchange")
+        isAcceptingCredential = false
+    }
+
+    val authTabLauncher = rememberLauncherForActivityResult(
+        AuthTabIntent.AuthenticateUserResultContract(),
+    ) { result ->
+        if (result.resultCode == AuthTabIntent.RESULT_OK) {
+            result.resultUri?.toString()?.let { authorizeWithAuthCode(it) }
+        }
+    }
+
+    /**
+     * Initiate the authorization code flow: calls `initiateAuthorization` to get an
+     * authorization URL, then launches an Auth Tab for the user to complete OAuth login.
+     */
+    fun initiateAndLaunchAuthorization() = scope.launch {
+        isAcceptingCredential = true
+        runCatching {
+            val redirectScheme = "sudodiedgeagentexample"
+            val redirectUri = "$redirectScheme://auth-callback"
+            val result = agent.credentials.exchange.openid4vc.initiateAuthorization(
+                credentialExchangeId,
+                InitiateAuthorizationConfiguration(
+                    clientId = OAUTH_CLIENT_ID,
+                    redirectUri = redirectUri,
+                ),
+            )
+            AuthTabIntent.Builder().build()
+                .launch(authTabLauncher, result.authorizationUrl.toUri(), redirectScheme)
+        }.showToastOnFailure(context, logger, "Failed to initiate authorization")
         isAcceptingCredential = false
     }
 
@@ -274,7 +331,8 @@ fun CredentialExchangeInfoScreen(
         credentialExchange,
         suitableDidsForExchange = suitableDids,
         acceptAriesCredential = { did -> acceptAriesCredential(did) },
-        authorizeExchange = { tx -> authorizeExchange(tx) },
+        authorizeExchange = { tx -> authorizeWithPreAuth(tx) },
+        initiateAndLaunchAuthorization = { initiateAndLaunchAuthorization() },
         acceptOpenId4VcCredential = { configId, did -> acceptOpenId4VcCredential(configId, did) },
         storeCredential = { storeCredential() },
         isAcceptingCredential,
@@ -296,6 +354,7 @@ private fun CredentialExchangeInfoScreenView(
     suitableDidsForExchange: SuitableDidsForExchange?,
     acceptAriesCredential: (did: String?) -> Unit,
     authorizeExchange: (String?) -> Unit,
+    initiateAndLaunchAuthorization: () -> Unit,
     acceptOpenId4VcCredential: (configId: String, did: String) -> Unit,
     storeCredential: () -> Unit,
     isAccepting: Boolean,
@@ -328,6 +387,7 @@ private fun CredentialExchangeInfoScreenView(
                     credentialExchange = credentialExchange,
                     suitableDidsForExchange = suitableDidsForExchange as SuitableDidsForExchange.OpenId4Vc,
                     authorizeExchange = authorizeExchange,
+                    initiateAndLaunchAuthorization = initiateAndLaunchAuthorization,
                     acceptCredential = acceptOpenId4VcCredential,
                     storeCredential = storeCredential,
                 )
@@ -425,6 +485,7 @@ private fun ColumnScope.CredentialExchangeInfoScreenViewOpenId4VcContent(
     credentialExchange: UICredentialExchange.OpenId4Vc,
     suitableDidsForExchange: SuitableDidsForExchange.OpenId4Vc,
     authorizeExchange: (String?) -> Unit,
+    initiateAndLaunchAuthorization: () -> Unit,
     acceptCredential: (configurationId: String, did: String) -> Unit,
     storeCredential: () -> Unit,
 ) {
@@ -508,23 +569,34 @@ private fun ColumnScope.CredentialExchangeInfoScreenViewOpenId4VcContent(
 
             // unauthorized -> authorized flow
             if (credentialExchange.exchange.state == CredentialExchangeState.OpenId4Vc.UNAUTHORIZED) {
-                val preAuth =
-                    (credentialExchange.exchange.requiredAuthorization as RequiredAuthorization.PreAuthorized)
-                preAuth.txCodeRequired?.let {
-                    TextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = inputTxCode,
-                        onValueChange = { inputTxCode = it },
-                        placeholder = { Text(text = "Enter PIN from issuer...") },
-                        singleLine = true,
-                    )
-                }
+                when (val requiredAuth = credentialExchange.exchange.requiredAuthorization) {
+                    is RequiredAuthorization.PreAuthorized -> {
+                        requiredAuth.txCodeRequired?.let {
+                            TextField(
+                                modifier = Modifier.fillMaxWidth(),
+                                value = inputTxCode,
+                                onValueChange = { inputTxCode = it },
+                                placeholder = { Text(text = "Enter PIN from issuer...") },
+                                singleLine = true,
+                            )
+                        }
 
-                Button(
-                    onClick = { authorizeExchange(inputTxCode.ifBlank { null }) },
-                    Modifier.fillMaxWidth(),
-                ) {
-                    Text(text = "Authorize")
+                        Button(
+                            onClick = { authorizeExchange(inputTxCode.ifBlank { null }) },
+                            Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = "Authorize")
+                        }
+                    }
+
+                    is RequiredAuthorization.AuthorizationCode -> {
+                        Button(
+                            onClick = { initiateAndLaunchAuthorization() },
+                            Modifier.fillMaxWidth(),
+                        ) {
+                            Text(text = "Login to Authorize")
+                        }
+                    }
                 }
             }
         }
@@ -656,6 +728,7 @@ private fun AriesAnoncredsPreview() {
             suitableDidsForExchange = SuitableDidsForExchange.Aries.NotApplicable,
             {},
             {},
+            {},
             { _, _ -> },
             {},
             false,
@@ -685,6 +758,7 @@ private fun AriesLdpPreview() {
                 preview = PreviewDataHelper.dummyUICredentialW3C(),
             ),
             suitableDidsForExchange = SuitableDidsForExchange.Aries.LdProof(dummyDids()),
+            {},
             {},
             {},
             { _, _ -> },
@@ -730,6 +804,7 @@ private fun Oid4vcUnauthorizedPreview() {
                 issuedPreviews = emptyList(),
             ),
             suitableDidsForExchange = SuitableDidsForExchange.OpenId4Vc(emptyMap()),
+            {},
             {},
             {},
             { _, _ -> },
@@ -779,6 +854,7 @@ private fun Oid4vcAuthorizedPreview() {
             ),
             {},
             {},
+            {},
             { _, _ -> },
             {},
             false,
@@ -822,6 +898,7 @@ private fun Oid4vcIssuedPreview() {
                 issuedPreviews = listOf(PreviewDataHelper.dummyUICredentialSdJwt()),
             ),
             suitableDidsForExchange = SuitableDidsForExchange.OpenId4Vc(emptyMap()),
+            {},
             {},
             {},
             { _, _ -> },

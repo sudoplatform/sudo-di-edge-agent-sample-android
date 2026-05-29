@@ -13,7 +13,11 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.OptIn
 import androidx.camera.core.ExperimentalGetImage
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -82,10 +86,17 @@ class MainActivity : ComponentActivity() {
             SudoDIEdgeAgentExampleTheme {
                 // A surface container using the 'background' color from the theme
                 Surface(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(WindowInsets.systemBars.asPaddingValues()),
                     color = MaterialTheme.colorScheme.background,
                 ) {
-                    MainNavigation(app.agent, app.sudoManager, app.logger, app.pendingDeepLinks)
+                    MainNavigation(
+                        app.agent,
+                        app.sudoManager,
+                        app.logger,
+                        app.pendingDeepLinks,
+                    )
                 }
             }
         }
